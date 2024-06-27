@@ -1,0 +1,14 @@
+name: pynirs
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - scikit-learn
+  - numpy
+  - scipy
+  - pytest
+  - pytest-cov
+  - umap-learn
+  - matplotlib
+  - jupyter
