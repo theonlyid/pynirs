@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-@author: Ali Zaidi
+Module for handling sigmoid fits and the meta-data associated with them.
+
+author: Ali Zaidi
 """
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
-
+from nirs_types import Param
 
 class Sigmoid:
+
     """
     Object that handles the sigmoid fits to cumsum data. Currently fits sigmoid curves bounded between 0 and 1.
 
@@ -21,6 +24,12 @@ class Sigmoid:
 
     y : np.ndarray[float]
         Data to fit sigmoid curve to.
+    
+    yhat: np.ndarray[flaot]
+        The predicted y-values based on the best-fit parameters.
+
+    params: Params
+        An object with the best fit parameters and their statistics. Type help(Params) for more info.
 
     params : dict
         The parameters returned by the fit() method, along with their covariance matrix. Has the folling attributes.
@@ -47,15 +56,15 @@ class Sigmoid:
             fs : float
                 The sampling rate used to normalize the parameters to seconds.
         """
-        self.x = x_data
-        self.y = y_data
+        self.x_data = x_data
+        self.y_data = y_data
         self.params = None
         self.yhat = None
         self.fs = fs
 
-    def fit(self, x_data: np.ndarray, y_data: np.ndarray, plot=True):
+    def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=True) -> None:
         """
-        Fit sigmoid curve to data.
+        Fit sigmoid curve to data. If no data is passed, it will use the x and y data stored in the object.
 
         Parameters
         ----------
@@ -68,9 +77,9 @@ class Sigmoid:
             plot: boolean (default = True)
                 Flag to plot the data after the fit for diagnostics
 
-        Returns
+        Output (does not return)
         -------
-        params : dict
+        self.params : dict
             The parameters returned by the fit() method, along with their covariance matrix. Has the folling attributes.
                 means (list[float]): the mean values of the parameters
                 cov (np.ndarray): the covariance matrix of the paramters
@@ -78,24 +87,28 @@ class Sigmoid:
                 yhat (np.ndarray): the y-values predicted from the fit params for the x_data provided
         """
 
-        y_obs = self.y - self.y.mean()
+        if x_data is None and y_data is None:
+             x_data = self.x_data
+             y_data = self.y_data
+    
+        y_obs = y_data - y_data[0]
         y_obs = np.cumsum(y_obs)/np.sum(y_obs)
-        p_opt, p_var = curve_fit(self.pred, self.x, y_obs, np.array([1, -len(self.x)/2], dtype=np.float64), maxfev=1_000_000_000)
-        y_hat = self.predict(self.x, p_opt[0], p_opt[1])
+        p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2], dtype=np.float64), maxfev=1_000_000_000)
+        y_hat = self.predict(x_data, p_opt[0], p_opt[1])
+        self.yhat = y_hat
 
-        rsquare = 1 - (np.var(y_data - y_hat)/np.var(y_data))
+        rsquare = 1 - (np.var(y_obs - y_hat)/np.var(y_obs))
 
         if plot:
             plt.figure()
-            plt.plot(self.x, y_obs)
-            plt.plot(self.x, y_hat)
+            plt.plot(x_data, y_obs)
+            plt.plot(x_data, y_hat)
             plt.grid()
-            plt.title(f"Fit results: R^2={rsquare}")
+            plt.title(f"Fit results: R^2={rsquare:0.2f}")
             plt.legend(['observed', 'fit'])
 
-        params = {"means": p_opt, "param_variance": p_var, "rsquare": rsquare, "yhat": y_hat}
+        params = Param(p_opt, p_var, rsquare)
         self.params = params
-        return params
 
     def predict(self, x_data: np.ndarray, slope: float, intercept: float):
         """

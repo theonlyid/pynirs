@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
 """
-Created on Thu Jun 20 13:08:32 2024
+This submodule contains the class definitions and methods for loading and working with NIRS experiments and events.
 
-@author: Ali Zaidi
+Author: Ali Zaidi
+Date: 20-June-2024
 """
 
 import pandas as pd
@@ -135,7 +135,7 @@ class Event:
         print("Instantiating Event object")
         self.fs = dataset.fs
         data = dataset.data.iloc[start-pre:stop+post,:].copy()
-        data['ts'] = data['ts'] - data['ts'].iloc[0]
+        data['ts'] = data['ts'] - data['ts'].iloc[pre + 1]
         data.set_index('ts')
         self.data = data
         self.duration = (stop - start)/self.fs
