@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """
 Python functions for the conversion of raw NIRS data to Hb-concs and TOI
 """
