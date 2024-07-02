@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
-from nirs_types import Param
+from pynirs.nirs_types import Param
 
 class Sigmoid:
 
@@ -43,7 +43,7 @@ class Sigmoid:
 
     def __init__(self, x_data: np.ndarray, y_data: np.ndarray, fs = 1):
         """
-        Instantiates an object with the relevant x and y data.
+        Instantiates an object with the relevant x and y data. Will automatically fit a sigmoid to the data.
 
         Parameters
         ----------
@@ -56,11 +56,13 @@ class Sigmoid:
             fs : float
                 The sampling rate used to normalize the parameters to seconds.
         """
+
         self.x_data = x_data
         self.y_data = y_data
-        self.params = None
-        self.yhat = None
         self.fs = fs
+        self.params = self.fit(x_data=x_data, y_data=y_data, plot=False)
+        self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1])
+        print(self)
 
     def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=True) -> None:
         """
@@ -77,9 +79,9 @@ class Sigmoid:
             plot: boolean (default = True)
                 Flag to plot the data after the fit for diagnostics
 
-        Output (does not return)
+        Returns
         -------
-        self.params : dict
+        params : Param (see nirs_types for parameter object definition)
             The parameters returned by the fit() method, along with their covariance matrix. Has the folling attributes.
                 means (list[float]): the mean values of the parameters
                 cov (np.ndarray): the covariance matrix of the paramters
@@ -95,8 +97,6 @@ class Sigmoid:
         y_obs = np.cumsum(y_obs)/np.sum(y_obs)
         p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2], dtype=np.float64), maxfev=1_000_000_000)
         y_hat = self.predict(x_data, p_opt[0], p_opt[1])
-        self.yhat = y_hat
-
         rsquare = 1 - (np.var(y_obs - y_hat)/np.var(y_obs))
 
         if plot:
@@ -107,8 +107,7 @@ class Sigmoid:
             plt.title(f"Fit results: R^2={rsquare:0.2f}")
             plt.legend(['observed', 'fit'])
 
-        params = Param(p_opt, p_var, rsquare)
-        self.params = params
+        return Param(p_opt, p_var, rsquare)
 
     def predict(self, x_data: np.ndarray, slope: float, intercept: float):
         """
@@ -133,8 +132,22 @@ class Sigmoid:
         return y
     
     def __repr__(self):
-            slope = self.params["means"][0]
-            intercept = self.params["means"][1]
+            slope = self.params.means[0]
+            intercept = self.params.means[1]
             repr = f"SigmoidFit(slope:{slope:0.2f}, intercept:{intercept:0.2f})"
             return repr
     
+
+    #TODO: Add t-test functionality for parameters
+    def ttest(param1, param2):
+         pass
+
+if __name__ == "__main__":
+
+    x = np.arange(100)
+    slope = 1
+    intercept = 50
+    y = 1/(1 + np.exp(-slope*(x-intercept)))
+
+    sig = Sigmoid(x, y)
+    print(sig)

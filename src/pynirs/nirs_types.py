@@ -16,8 +16,8 @@ class Param:
     means: list[float]
         The mean values of the slope and intercept, respectively
 
-    cov: np.ndarray[float]
-        The covariance matrix of the best fit parameters. Variance of each parameter is on the diagonals.
+    cov: numpy.ndarray[float]
+        The covariance matrix of the best-fit parameters. Variance of each parameter is on the diagonal. Use vars = np.diag(cov).
 
     rsquare: float
         The R-square value of the fit

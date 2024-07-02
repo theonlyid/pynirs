@@ -135,14 +135,14 @@ class Event:
         print("Instantiating Event object")
         self.fs = dataset.fs
         data = dataset.data.iloc[start-pre:stop+post,:].copy()
+        self.init_params = {'pre': pre, 'start':start, 'stop': stop, 'post': post, 'detrend': detrend, 'Experiment': dataset.__repr__()}
         data['ts'] = data['ts'] - data['ts'].iloc[pre + 1]
-        data.set_index('ts')
+        data.set_index('ts', inplace=True, drop=False)
         self.data = data
-        self.duration = (stop - start)/self.fs
+        self.duration = (stop - start + 1)/self.fs
         self.calc_features()
         if detrend:
             self.detrend()
-
 
 
     def detrend(self):
