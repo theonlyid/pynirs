@@ -1,7 +1,6 @@
 """
-Created on Fri Jun 21 08:17:06 2024
+Python package for analysis of timeseries data recorded for the NIRS or IP animal experiments.
 
-@author: azaidi02
+Currently, the default sampling rate assumed is 1 Hz. Most code should work but is untested at other sampling rates.
+
 """
-
-import numpy as np

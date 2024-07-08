@@ -11,6 +11,7 @@ from scipy import signal, fft, stats
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import pickle
+import re
 
 
 class Experiment:
@@ -48,6 +49,7 @@ class Experiment:
         return data, comments
 
     def extract_NE(self):
+        self.__log("Extracting NE")
         tmp = self.comments.str.extract(r'(?P<event>NE.+)(?P<dose>\d\.\d{2}|Off)')
         tmp = tmp[~tmp.iloc[:,0].isna()]
 
@@ -58,7 +60,29 @@ class Experiment:
             ne_dose[i:] = tmp['dose'][i]
         self.data['NE dose'] = ne_dose
 
-
+    def get_challenges(self):
+        self.__log("Extracting physiological challenges")
+        challenges=[]
+        tmp  = self.comments.str.extract(r" (?P<challenge>hypoxia.\d*|NE|BSL).(?P<type>start|end|off|stop)", flags=re.IGNORECASE, expand=False)
+        tmp = tmp[~tmp['challenge'].isna()]
+        for challenge in tmp.challenge.unique():
+            if len(tmp[tmp['challenge'] == challenge].index):
+                start, end = tmp[tmp['challenge']==challenge].index
+            challenges.append([challenge, start, end, end-start+1])
+        challenges = pd.DataFrame(challenges, columns=['challenge', 'start', 'end', 'duration'])
+        self.challenges = challenges
+        return self.challenges
+    
+    def challenges_to_events(self, pre=60, post=60):
+        events = {}
+        for i in range(len(self.challenges.challenge)):
+            tmp = self.challenges.iloc[i,:]
+            tmp_challenge = Event(self, tmp.start, tmp.end, pre=pre, post=post)
+            tmp_challenge.calc_features()
+            events[tmp.challenge] = tmp_challenge
+        self.events = events
+        return events
+        
     def resample(self, fs_new):
         self.__log(f"Resampling from {self.fs} to {fs_new} Hz")
         nsamples = self.data.shape[0] * fs_new // self.fs
@@ -88,7 +112,7 @@ class Experiment:
     def butter(self, order=2, wn=1/10, fs=1, btype='lowpass'):
         b, a = signal.butter(2, wn, fs=fs, btype=btype)
         self.filter_params = {'type': 'butter', 'order': order, 'Wn': wn, 'fs':fs, 'btype':btype, 'b': b, 'a':a}
-        self.__log(f"Generating Butterworth filter. Params:{self.filter_params}")
+        self.__log(f"Generated Butterworth filter. Params:{self.filter_params}")
 
     def filter(self):
         if self.filter_params is None:
@@ -120,6 +144,7 @@ class Experiment:
         self.fs = 100
 
     def save(self, filename):
+        self.__log(f"Saving object as {filename}")
         with open(filename, "wb") as f:
             pickle.dump(self, f)
 
@@ -136,7 +161,7 @@ class Event:
         self.fs = dataset.fs
         data = dataset.data.iloc[start-pre:stop+post,:].copy()
         self.init_params = {'pre': pre, 'start':start, 'stop': stop, 'post': post, 'detrend': detrend, 'Experiment': dataset.__repr__()}
-        data['ts'] = data['ts'] - data['ts'].iloc[pre + 1]
+        data['ts'] = data['ts'] - data['ts'].iloc[pre]
         data.set_index('ts', inplace=True, drop=False)
         self.data = data
         self.duration = (stop - start + 1)/self.fs
@@ -161,7 +186,7 @@ class Event:
 
 
     def calc_features(self):
-        z_data = (self.data - self.data.iloc[:10, :].mean(axis=0)).copy()
+        z_data = (self.data - self.data.iloc[:self.init_params['pre'], :].mean(axis=0)).copy()
         f_sum = z_data.sum(axis=0).copy()
         f_cumsum =z_data.cumsum(axis=0).copy()
         self.features = {'data': z_data, 'sum': f_sum, 'cumsum': f_cumsum}

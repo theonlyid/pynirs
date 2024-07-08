@@ -7,6 +7,7 @@ Date: 27-June-2024
 """
 
 import numpy as np
+from typing import NamedTuple
 
 class Param:
     """An object to store the parameters returned by the Sigmoid.fit() method.
@@ -31,3 +32,6 @@ class Param:
 
     def __repr__(self) -> str:
          r = f"Params(means:{self.means}, R-square:{self.rsquare:0.2f})"
+
+
+TTestResult = NamedTuple('TTestResult', ['T-statistic', 'p-value'])
