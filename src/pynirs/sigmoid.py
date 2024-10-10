@@ -58,13 +58,13 @@ class Sigmoid:
         """
 
         self.x_data = x_data
-        self.y_data = y_data
+        self.y_data = y_data - y_data[0]
         self.fs = fs
         self.params = self.fit(x_data=x_data, y_data=y_data, plot=True)
-        self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1])
+        self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1], scale=self.params.means[2])
         print(self)
 
-    def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=True) -> None:
+    def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=False) -> Param:
         """
         Fit sigmoid curve to data. If no data is passed, it will use the x and y data stored in the object.
 
@@ -93,11 +93,11 @@ class Sigmoid:
              x_data = self.x_data
              y_data = self.y_data
     
-        y_obs = y_data - y_data[0]
+        y_obs = y_data
         # y_obs = np.cumsum(y_obs)/np.sum(y_obs)
         # y_obs = y_data
-        p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2], dtype=np.float64), maxfev=1_000_000_000)
-        y_hat = self.predict(x_data, p_opt[0], p_opt[1])
+        p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2, 1], dtype=np.float64), maxfev=1_000_000_000)
+        y_hat = self.predict(x_data, p_opt[0], p_opt[1], p_opt[2])
         rsquare = 1 - (np.var(y_obs - y_hat)/np.var(y_obs))
 
         if plot:
@@ -110,7 +110,7 @@ class Sigmoid:
 
         return Param(p_opt, p_var, rsquare)
 
-    def predict(self, x_data: np.ndarray, slope: float, intercept: float):
+    def predict(self, x_data: np.ndarray, slope: float, intercept: float, scale: float = 1):
         """
         Predict the y-values of a sigmoid curve for the x_data and params provided.
 
@@ -129,13 +129,13 @@ class Sigmoid:
                 The predicted values based on the x-data, slope and intercept
         
         """
-        y = 1/(1 + np.exp(-slope*(x_data - intercept)))
+        y = (1/(1 + np.exp(-slope*(x_data - intercept)))) * scale
         return y
     
     def __repr__(self):
             slope = self.params.means[0]
             intercept = self.params.means[1]
-            repr = f"SigmoidFit(slope:{slope:0.2f}, intercept:{intercept:0.2f})"
+            repr = f"SigmoidFit(slope:{slope:0.2f}, intercept:{intercept:0.2f}, scale:{self.params.means[2]:0.2f})"
             return repr
     
 
@@ -145,10 +145,10 @@ class Sigmoid:
 
 if __name__ == "__main__":
 
-    x = np.arange(100)
-    slope = 1
+    x = np.arange(-100, 100)
+    slope = 0.1
     intercept = 50
-    y = 1/(1 + np.exp(-slope*(x-intercept)))
+    scale = 10
+    y = (1/(1 + np.exp(-slope*(x-intercept)))) * scale
 
     sig = Sigmoid(x, y)
-    print(sig.params.means)
