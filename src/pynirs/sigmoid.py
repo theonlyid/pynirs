@@ -103,7 +103,7 @@ class Sigmoid:
         if plot:
             plt.figure()
             plt.plot(x_data, y_obs)
-            plt.plot(x_data, y_hat)
+            plt.plot(x_data, y_hat, "--")
             plt.grid()
             plt.title(f"Fit results: R^2={rsquare:0.2f}")
             plt.legend(['observed', 'fit'])
