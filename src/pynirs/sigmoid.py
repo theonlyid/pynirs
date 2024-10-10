@@ -60,7 +60,7 @@ class Sigmoid:
         self.x_data = x_data
         self.y_data = y_data
         self.fs = fs
-        self.params = self.fit(x_data=x_data, y_data=y_data, plot=False)
+        self.params = self.fit(x_data=x_data, y_data=y_data, plot=True)
         self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1])
         print(self)
 
@@ -94,7 +94,8 @@ class Sigmoid:
              y_data = self.y_data
     
         y_obs = y_data - y_data[0]
-        y_obs = np.cumsum(y_obs)/np.sum(y_obs)
+        # y_obs = np.cumsum(y_obs)/np.sum(y_obs)
+        # y_obs = y_data
         p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2], dtype=np.float64), maxfev=1_000_000_000)
         y_hat = self.predict(x_data, p_opt[0], p_opt[1])
         rsquare = 1 - (np.var(y_obs - y_hat)/np.var(y_obs))
@@ -150,4 +151,4 @@ if __name__ == "__main__":
     y = 1/(1 + np.exp(-slope*(x-intercept)))
 
     sig = Sigmoid(x, y)
-    print(sig)
+    print(sig.params.means)
