@@ -33,5 +33,5 @@ class Param:
     def __repr__(self) -> str:
          r = f"Params(means:{self.means}, R-square:{self.rsquare:0.2f})"
 
-
-TTestResult = NamedTuple('TTestResult', ['T-statistic', 'p-value'])
+# TODO: implement TTestResult Tuple
+# TTestResult = NamedTuple('TTestResult', ['T-statistic', 'p-value'])

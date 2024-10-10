@@ -27,7 +27,7 @@ where path-to-repo is the path to the remote folder on One-Drive.
 Then you need to install the code. Run the following commands from inside the cloned folder:
 
 ```
-$ conda env create -f environment.py
+$ conda env create -f src/deps/environment.py
 $ pip install .
 ```
 </li>

@@ -12,3 +12,5 @@ dependencies:
   - umap-learn
   - matplotlib
   - jupyter
+  - pip
+  

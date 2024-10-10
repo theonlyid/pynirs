@@ -19,13 +19,17 @@ class Experiment:
     A class for loading and manipulating timeseries data from a CSV file. Has methods to allow resampling, filtering, etc.
     """
 
-    def __init__(self, filename, auto_resample=True, extract_ne=True, fs=100):
+    def __init__(self, source, auto_resample=True, extract_ne=True, fs=100):
         self._log = []
         self.__log("Instantiating Experiment object")
-        self.filename = filename
         self.fs = fs
         self.filter_params = None
-        self.data, self.comments = self.load_file(filename)
+        if isinstance(source, pd.DataFrame):
+            self.data, self.comments = self.from_dataframe(source)
+            self.filename = f"{source}"
+        else:
+            self.filename = source
+            self.data, self.comments = self.load_file(source)
         self._data = self.data.copy()
         if extract_ne:
             self.extract_NE()
@@ -37,18 +41,36 @@ class Experiment:
         print(statement)
 
     def get_log(self):
+        """Returns the log of the experiment object"""
         return self._log
 
 
     def load_file(self, filename: str, repace_data=True) -> list[pd.DataFrame]:
+        """
+        Loads a CSV file and converts it to a pandas dataframe.
+        """
         self.__log(f"Loading {filename}")
         data = pd.read_csv(filename, low_memory=False)
         comments = data.pop('comments')
         data.pop('datetime')
         comments = comments[~comments.isna()].copy()
         return data, comments
+    
+    def from_dataframe(self, data: pd.DataFrame, repace_data=True) -> list[pd.DataFrame]:
+        """
+        Create an Experiment object from a pandas DataFrame.
+        """
+        self.__log(f"Generating from dataframe: {data}")
+        self.data = data
+        comments = data.pop('comments')
+        data.pop('datetime')
+        comments = comments[~comments.isna()].copy()
+        return data, comments
 
     def extract_NE(self):
+        """
+        Crawls through the comments to isolate NE-dose and generates its timeseries, appending 'NE dose' it to self.data
+        """
         self.__log("Extracting NE")
         tmp = self.comments.str.extract(r'(?P<event>NE.+)(?P<dose>\d\.\d{2}|Off)')
         tmp = tmp[~tmp.iloc[:,0].isna()]
@@ -61,11 +83,15 @@ class Experiment:
         self.data['NE dose'] = ne_dose
 
     def get_challenges(self):
+        """
+        Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.
+        """
         self.__log("Extracting physiological challenges")
         challenges=[]
-        tmp  = self.comments.str.extract(r" (?P<challenge>hypoxia.\d*|NE|BSL).(?P<type>start|end|off|stop)", flags=re.IGNORECASE, expand=False)
+        tmp  = self.comments.str.extract(r" (?P<challenge>hypoxia.\d*|NE|BSL).*(?P<type>start|end|off|stop)", flags=re.IGNORECASE, expand=False)
         tmp = tmp[~tmp['challenge'].isna()]
         for challenge in tmp.challenge.unique():
+            print(challenge)
             if len(tmp[tmp['challenge'] == challenge].index):
                 start, end = tmp[tmp['challenge']==challenge].index
             challenges.append([challenge, start, end, end-start+1])
@@ -84,8 +110,11 @@ class Experiment:
         return events
         
     def resample(self, fs_new):
-        self.__log(f"Resampling from {self.fs} to {fs_new} Hz")
-        nsamples = self.data.shape[0] * fs_new // self.fs
+        """
+        Resample data to the given sampling rate.
+        """
+        self.__log(f"Resampling from {self.fs:0.2f} to {fs_new:0.2f} Hz")
+        nsamples = np.int16(self.data.shape[0] * fs_new // self.fs)
         d_np = self.data.to_numpy()
         d_r = signal.resample(d_np, nsamples, axis=0)
         df_r = pd.DataFrame(d_r, columns=self.data.columns)
@@ -98,7 +127,7 @@ class Experiment:
         _comments.index = _comments.index.to_numpy() * fs_new // self.fs
         self.comments = _comments
         self.fs = fs_new
-        self.extract_NE()
+        # self.extract_NE()
 
     def get_fft(self, n=2048):
         self.__log(f"Generating FFT with fs={self.fs}")
@@ -137,6 +166,9 @@ class Experiment:
         self.extract_NE()
 
     def reset(self):
+        """
+        Reset data to the original dataframe generated when the object was instantiated.
+        """
         self.__log("Reseting data to original values loaded from file.")
         self.data = self._data.copy()
         self.comments = self._comments.copy()
@@ -144,6 +176,7 @@ class Experiment:
         self.fs = 100
 
     def save(self, filename):
+        "Save pickled object"
         self.__log(f"Saving object as {filename}")
         with open(filename, "wb") as f:
             pickle.dump(self, f)
@@ -159,7 +192,8 @@ class Event:
     def __init__(self, dataset: Experiment = None, start=0, stop=-1, pre=0, post=0, detrend=False):
         print("Instantiating Event object")
         self.fs = dataset.fs
-        data = dataset.data.iloc[start-pre:stop+post,:].copy()
+        data = dataset.data.iloc[start-pre*self.fs:stop+post*self.fs,:].copy()
+        data = data - data.iloc[:pre, :].mean(axis=0)
         self.init_params = {'pre': pre, 'start':start, 'stop': stop, 'post': post, 'detrend': detrend, 'Experiment': dataset.__repr__()}
         data['ts'] = data['ts'] - data['ts'].iloc[pre]
         data.set_index('ts', inplace=True, drop=False)
@@ -171,8 +205,8 @@ class Event:
 
 
     def detrend(self):
-            _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type='linear')
-            self.data.iloc[:,1:] = _d.iloc[:,1:]
+        _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type='linear')
+        self.data.iloc[:,1:] = _d.iloc[:,1:]
 
 
     def get_fft(self, n=2048):
@@ -187,8 +221,8 @@ class Event:
 
     def calc_features(self):
         z_data = (self.data - self.data.iloc[:self.init_params['pre'], :].mean(axis=0)).copy()
-        f_sum = z_data.sum(axis=0).copy()
-        f_cumsum =z_data.cumsum(axis=0).copy()
+        f_sum = z_data.sum(axis=0).copy()/self.fs
+        f_cumsum =z_data.cumsum(axis=0).copy()/self.fs
         self.features = {'data': z_data, 'sum': f_sum, 'cumsum': f_cumsum}
         
 
@@ -198,4 +232,5 @@ class Event:
 
     def __repr__(self):
         return "Event object"
+
 
