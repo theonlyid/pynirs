@@ -110,7 +110,7 @@ class Sigmoid:
 
         return Param(p_opt, p_var, rsquare)
 
-    def predict(self, x_data: np.ndarray, slope: float, intercept: float, scale: float = 1):
+    def predict(self, x_data: np.ndarray, slope: float, intercept: float, scale: float = 1) -> np.ndarray:
         """
         Predict the y-values of a sigmoid curve for the x_data and params provided.
 
