@@ -3,4 +3,5 @@ build/
 pynirs.egg-info/
 *.e*
 src/pynirs/__pycache__/
-
+*.pkl
+*test*
