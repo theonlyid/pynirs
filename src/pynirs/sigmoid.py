@@ -31,14 +31,6 @@ class Sigmoid:
     params: Params
         An object with the best fit parameters and their statistics. Type help(Params) for more info.
 
-    params : dict
-        The parameters returned by the fit() method, along with their covariance matrix. Has the folling attributes.
-
-            means (list[float]): the mean values of the parameters
-            cov (np.ndarray): the covariance matrix of the paramters
-            rsquare (float): the R-square for the fit
-            yhat (np.ndarray): the y-values predicted from the fit params for the x_data provided
-
     """
 
     def __init__(self, x_data: np.ndarray, y_data: np.ndarray, fs = 1):
