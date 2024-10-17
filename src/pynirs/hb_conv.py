@@ -1,11 +1,20 @@
 """
-Python functions for the conversion of raw NIRS data to Hb-concs and TOI
+Module housing methods for calculating hb-concentration changes and toi from raw NIRS data.
+
+
+This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.
+
+
+Author: Ali Zaidi
+
+Date: 05-OCT-2024
 """
 
 import numpy as np
-from decompositions import svd_clean
+import pandas as pd
+from sklearn.decomposition import FastICA
 
-class HbConv():
+class HbConv:
     def __init__(self, data: np.ndarray = None, svd_clean: bool = True):
         """
         Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.
@@ -37,13 +46,18 @@ class HbConv():
         if data is not None:
             # Convert to hb-concs and toi
             abs_data = data
-            hbc_near, hbc_far, toi = self.hbc_from_abs()
+            hbc_near, hbc_far, toi = self.hbc_from_abs(abs_data)
             obs = dict({"raw_abs":abs_data, "hbc_near": hbc_near, "hbc_far": hbc_far, "toi": toi})
             self.observed = obs
 
         if svd_clean:
             # Clean the data
-            pass
+            near, far = self.subtract_ambient(abs_data)
+            near_clean, _ = self.svd_clean(near)
+            far_clean, _  = self.svd_clean(far)
+            hbc_near_clean, hbc_far_clean, toi_clean = self.clean_hbc_toi(abs_data)
+            clean = {"raw_abs": np.vstack((near_clean, far_clean)), "hbc_near": hbc_near_clean, "hbc_far": hbc_far_clean, "toi": toi_clean}
+            self.cleaned = clean
 
 
     def __gen_params(self) -> dict:
@@ -55,7 +69,7 @@ class HbConv():
                             [1.3514, 0.8968]])
         
         d = np.array([1, 1.6], dtype=np.float16) # Source detector distance per channel
-        wavelenths = (680, 730, 810, 850, 910) # Wavelengths
+        wavelenths = np.array([680, 730, 810, 850, 910], dtype=np.float16) # Wavelengths
         dpf = 6 # Differential path length factor
     
         # Generate matrices for conversion to Hb-concentration changes
@@ -66,7 +80,7 @@ class HbConv():
         A_far_inv  = np.linalg.pinv(A_far)
 
         params = {"e_coef": e_coef,
-                  "wl": wavelenths,
+                  "wavelengths": wavelenths,
                   "dpf": dpf,
                   "sd_distance": d,
                   "A_near_inv": A_near_inv,
@@ -136,7 +150,7 @@ class HbConv():
         return OD_grads
 
 
-    def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray) -> np.ndarray:
+    def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray, svd_clean=False) -> np.ndarray:
         """
         Calculates TOI using coefficients similar to the PLM.
 
@@ -149,15 +163,20 @@ class HbConv():
         """
 
         OD_grads = self.calc_gradients(near_pd_reads, far_pd_reads)
+        
+        if svd_clean:
+            OD_grads, _ = self.svd_clean(OD_grads)
+            OD_grads = OD_grads.T
 
-        h =4.6E-4  # Wavelength dependence of scattering (1/nm);
+        print(OD_grads.shape)
+        h = 4.6E-4  # Wavelength dependence of scattering (1/nm);
         usp = 1 - h * self.__params["wavelengths"]
 
         # step 3: Estimate absorbance coefficient
-        ua = 1 / (3 * usp) * (np.log(10) * OD_grads - 2 / np.mean(self.__params["d"])) ** 2
+        ua = 1 / (3 * usp) * (np.log(10) * OD_grads - 2 / np.mean(self.__params["sd_distance"])) ** 2
 
         # step 4: estimate hb concentrations
-        hb_concs = np.matmul(self.__params["e_coef"], np.transpose(ua))
+        hb_concs = np.linalg.pinv(self.__params["e_coef"]) @ ua.T
         hb_concs = np.transpose(hb_concs)
 
         # step 5: calculate TOI:
@@ -177,8 +196,96 @@ class HbConv():
         d[:, 11] = df.iloc[:, 12].to_numpy()
         return d
 
+
+    def svd(self, data: np.ndarray, full_matrices: bool=False) -> list[np.ndarray]:
+        """
+        Perform Singluar Value Decomposition on NIRS data
+
+        Arguments
+        ---------
+            data: np.ndarray (shape=(channels, observations))
+                The data to be decomposed.
+
+            full_matrices: boolean (default=False)
+                Whether to calculate the full U and V matrices (which is rarely a good idea!)
+
+        Returns
+        -------
+            (U,S,V): tuple
+                The matrices resulting from the SVD as a tuple. For more info, lookup numpy.linalg.svd.
+        """
+
+        # First check whether the data is the correct type
+        if type(data) is not np.ndarray:
+            raise Exception('data must be a numpy array')
+        
+        # if someone accidentally passes data with observations as rows, transpose
+        if np.argmax(data.shape) == 0:
+            data = data.T
+
+        # Now do the SVD and return the result
+        return np.linalg.svd(data, full_matrices=full_matrices)
+    
+
+    def ica(data):
+        "Perform an Independent Component Analysis based decomposition on raw NIRS"
+        return "Not Implemented"
+
+    def svd_clean(self, data, return_noise=True):
+        "Clean raw NIRS 5WL data with SVD, return cleaned raw data"
+
+        if data.shape[0] < data.shape[1]:
+            data = data.T
+
+        raw_data = data
+        raw_data_means = np.mean(raw_data, axis=0)
+        raw_data_mc = raw_data - raw_data_means
+
+        u,s,v = np.linalg.svd(raw_data_mc.T, full_matrices=False)
+        
+        noise = np.mean(u[:,0])*v[0,:]
+        rec = u[:,1:-1] @ np.diag(s[1:-1]) @ v[1:-1,:]
+        rec = rec.T
+        clean_data = (rec - rec[0,:] + raw_data[0,:]).T
+
+        if return_noise:
+            return clean_data, noise
+        else:
+            return clean_data
+        
+
+    def clean_hbc_toi(self, data): #TODO: Take 5WL data and return cleaned data
+        "Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI"
+
+        near, far = self.subtract_ambient(data)
+        near_clean, _ = self.svd_clean(near)
+        far_clean, _ = self.svd_clean(far)
+
+        near_hb_clean, far_hb_clean = self.calc_hb_concs(near_clean, far_clean)
+        toi_clean = self.calc_toi(near_clean, far_clean, svd_clean=False)
+
+        return near_hb_clean, far_hb_clean, toi_clean
+
+
+
 if __name__ == "__main__":
-    hbc = HbConv()
-    # print(hbc.get_params())
-    hbc.test_params()
+    import pickle
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    with open('src/pynirs/combined_data.pkl', 'rb') as f:
+        data = pickle.load(f)
+    
+    cols = [f"c NIRS 1.channel[{i}].1" for i in range(12)]
+    pd_reads = data[cols].to_numpy().T
+
+    hb = HbConv(pd_reads)
+    plt.subplots(2,1)
+    plt.subplot(211)
+    plt.plot(hb.observed["toi"])
+    plt.subplot(212)
+    plt.plot(hb.cleaned["toi"])
+    plt.show()
+    print("done")
 
