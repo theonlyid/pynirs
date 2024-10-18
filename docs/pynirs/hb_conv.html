@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.9.2" />
 <title>pynirs.hb_conv API documentation</title>
-<meta name="description" content="Python functions for the conversion of raw NIRS data to Hb-concs and TOI" />
+<meta name="description" content="Module housing methods for calculating hb-concentration changes and toi from raw NIRS data …" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
 <link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
@@ -22,103 +22,310 @@
 <h1 class="title">Module <code>pynirs.hb_conv</code></h1>
 </header>
 <section id="section-intro">
-<p>Python functions for the conversion of raw NIRS data to Hb-concs and TOI</p>
+<p>Module housing methods for calculating hb-concentration changes and toi from raw NIRS data.</p>
+<p>This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.</p>
+<p>Author: Ali Zaidi</p>
+<p>Date: 05-OCT-2024</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">&#34;&#34;&#34;
-Python functions for the conversion of raw NIRS data to Hb-concs and TOI
+Module housing methods for calculating hb-concentration changes and toi from raw NIRS data.
+
+
+This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.
+
+
+Author: Ali Zaidi
+
+Date: 05-OCT-2024
 &#34;&#34;&#34;
 
 import numpy as np
+import pandas as pd
+from sklearn.decomposition import FastICA
 
-#The coefficients for conversion of optical density to Hb-concentrations.
-E_COEFFS = np.array([[0.3194, 2.5713],
-                        [0.4383, 1.3029],
-                        [0.9291, 0.7987],
-                        [1.1596, 0.7861],
-                        [1.3514, 0.8968]])
+class HbConv:
+    def __init__(self, data: np.ndarray = None, svd_clean: bool = True):
+        &#34;&#34;&#34;
+        Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.
 
+        Parameters
+        ----------
+            data: np.ndarray
+                The raw data as a 12-channel matrix with each channel as a column vector
+            svd_clean: bool
+                Whether or not to apply the SVD cleaning on the data
 
-def subtract_ambient(pd_reads: np.array):
-    near_vals = pd_reads[:5, :] - pd_reads[5, :]
-    far_vals = pd_reads[6:11, :] - pd_reads[11, :]
+        Attributes
+        ----------
+            observed: dict
+                A dictionary of data with the raw and converted data as was recorded. 
+                
+                raw_data: np.ndarray (shape=(12,nobs))
+                    The raw absorbance data
 
-    return near_vals, far_vals
+                hb_concs: np.ndarray
+                The predicted values based on the x-data, slope and intercept
+        
+        &#34;&#34;&#34;
+       
+        #The coefficients for conversion of optical density to Hb-concentrations.
+        self.__params = self.__gen_params()
+        
+        # If data was passed during instantiation
+        if data is not None:
+            # Convert to hb-concs and toi
+            abs_data = data
+            hbc_near, hbc_far, toi = self.hbc_from_abs(abs_data)
+            obs = dict({&#34;raw_abs&#34;:abs_data, &#34;hbc_near&#34;: hbc_near, &#34;hbc_far&#34;: hbc_far, &#34;toi&#34;: toi})
+            self.observed = obs
 
-
-def calc_hb_concs(near_pd_reads, far_pd_reads):
-    # Declare constants
-    DPF = 6  # differential pathlength factor (6 is default in PLM).
-    wls = (680, 730, 810, 850, 910)  # wavelength of each LED in nm
-    d = [1, 1.6]  # specify source-detector positions
-
-    e_coef = E_COEFFS
-
-    # Step 1: calculate the relative changes in OD
-    near_delta_ODs = -np.log10(near_pd_reads.T / near_pd_reads[:, 0])  # normalize PD reads to first sample
-    far_delta_ODs = -np.log10(far_pd_reads.T / far_pd_reads[:, 0])
-
-    # step 2: Scale the extinction coefficient wavelength by assumed pathlength
-    A_near = e_coef * d[0] * DPF  # A is e_coef times by assumed pathlength
-    A_far = e_coef * d[1] * DPF
-
-    # step 3: calculate hb concentrations.
-    concs_near = 1000 * np.linalg.pinv(A_near) @ near_delta_ODs.T
-    concs_far = 1000 * np.linalg.pinv(A_far) @ far_delta_ODs.T
-
-    return concs_near, concs_far
-
-
-def calc_toi(near_pd_reads, far_pd_reads):
-    &#34;&#34;&#34;
-    Calculates TOI using coefficients similar to the PLM.
-
-    Function inputs:
-    1. Ambient subtracted near PD reads
-    2. Ambient subtracted far PD reads
-
-    Function outputs:
-        toi
-    &#34;&#34;&#34;
-    # declare constants
-    h = 0.00046  # Wavelength dependence of scattering (1/nm);
-    d = np.array([1, 1.6])  # source-detector seperations
-    wls = np.array([680, 730, 810, 850, 910])  # LED wavelengths in nm
-    abs_offsets = np.array([0.62517, 0.81141, 0.82149, 0.81788, 0.67964])  # calibration coefficients
-    e_coef = E_COEFFS
-
-    # Step 1: Estimate the optical density gradient.
-    OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
-    OD_grads = OD_grads.T + abs_offsets / (d[1] - d[0])
-
-    # Step 2: estimate the effect of the wavelength dependence of scattering
-    usp = 1 - h * wls
-
-    # step 3: Estimate absorbance coefficient
-    ua = 1 / (3 * usp) * (np.log(10) * OD_grads - 2 / np.mean(d)) ** 2
-
-    # step 4: estimate hb concentrations
-    hb_concs = np.matmul(np.linalg.pinv(e_coef), np.transpose(ua))
-    hb_concs = np.transpose(hb_concs)
-
-    # step 5: calculate TOI:
-    toi = hb_concs[:, 0] / np.sum(hb_concs, 1) * 100
-
-    return toi
+        if svd_clean:
+            # Clean the data
+            near, far = self.subtract_ambient(abs_data)
+            abs_pre_clean = np.vstack((near, far))
+            abs_post_clean, noise = self.svd_clean(abs_pre_clean)
+            near_clean, far_clean = abs_post_clean[:5, :], abs_post_clean[5:, :]
+            hbc_near_clean, hbc_far_clean = self.calc_hb_concs(near_clean, far_clean)
+            toi_abs = self.calc_toi(near_clean, far_clean)
+            toi_ods = self.calc_toi(near, far, svd_clean=True)
+            clean = {&#34;raw_abs&#34;: np.vstack((near_clean, far_clean)),
+                     &#34;hbc_near&#34;: hbc_near_clean,
+                     &#34;hbc_far&#34;: hbc_far_clean,
+                     &#34;toi_abs&#34;: toi_abs,
+                     &#34;toi_ods&#34;: toi_ods}
+            self.cleaned = clean
 
 
-def get_pd_reads(df):
-    &#34;&#34;&#34;
-    Get PD reads from Neurokey dataframe returned by NKY-utils.
-    &#34;&#34;&#34;
-    d = np.empty((len(df), 12))
-    d[:, :5] = df.iloc[:, 1:6].to_numpy()
-    d[:, 5] = df.iloc[:, 11].to_numpy()
-    d[:, 6:11] = df.iloc[:, 6:11].to_numpy()
-    d[:, 11] = df.iloc[:, 12].to_numpy()
-    return d</code></pre>
+    def __gen_params(self) -&gt; dict:
+        &#34;Generate a dictionary of params used in calculating Hb-concs and TOI.&#34;
+        e_coef = np.array([[0.3194, 2.5713],
+                            [0.4383, 1.3029],
+                            [0.9291, 0.7987],
+                            [1.1596, 0.7861],
+                            [1.3514, 0.8968]])
+        
+        d = np.array([1, 1.6], dtype=np.float16) # Source detector distance per channel
+        wavelenths = np.array([680, 730, 810, 850, 910], dtype=np.float16) # Wavelengths
+        dpf = 6 # Differential path length factor
+    
+        # Generate matrices for conversion to Hb-concentration changes
+        A_near = e_coef * d[0] * dpf
+        A_near_inv  = np.linalg.pinv(A_near)
+
+        A_far = e_coef * d[1] * dpf
+        A_far_inv  = np.linalg.pinv(A_far)
+
+        params = {&#34;e_coef&#34;: e_coef,
+                  &#34;wavelengths&#34;: wavelenths,
+                  &#34;dpf&#34;: dpf,
+                  &#34;sd_distance&#34;: d,
+                  &#34;A_near_inv&#34;: A_near_inv,
+                  &#34;A_far_inv&#34;: A_far_inv,
+                  &#34;abs_offsets&#34;: np.array([0.62517, 0.81141, 0.82149, 0.81788, 0.67964])}  # calibration coefficients
+        
+        return params
+    
+    
+    def get_params(self) -&gt; dict:
+        &#34;Returns the dictionary of parameters used for Hb-conc and TOI calculation&#34;
+        return self.__params
+
+    
+    def hbc_from_abs(self, abs_data: np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+        &#34;&#34;&#34;
+        Perform Singluar Value Decomposition on NIRS data
+
+        Arguments
+        ---------
+            abs_data: np.ndarray
+                The raw absorbance data (before ambient subtraction). Shape is nchan x nobs
+
+        Returns
+        -------
+            near_hbc: np.ndarray (shape=(4, nobs))
+                near hb-concentration changes
+
+            far_hbc: np.ndarray (shape=(4, nobs))
+                far hb-concentration changes
+
+            toi: np.ndarray
+                The calculated toi values
+        &#34;&#34;&#34;
+        near, far = self.subtract_ambient(abs_data)
+        near_hbc, far_hbc = self.calc_hb_concs(near, far)
+        toi = self.calc_toi(near, far)
+        return near_hbc, far_hbc, toi
+
+    
+    def subtract_ambient(self, pd_reads: np.ndarray) -&gt; np.ndarray:
+        near_vals = pd_reads[:5, :] - pd_reads[5, :]
+        far_vals = pd_reads[6:11, :] - pd_reads[11, :]
+        return near_vals, far_vals
+
+
+    def calc_hb_concs(self, near_pd_reads: np.ndarray, far_pd_reads:np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+
+        A_near_inv = self.__params[&#34;A_near_inv&#34;]
+        A_far_inv = self.__params[&#34;A_far_inv&#34;]
+
+        # calculate the relative changes in OD
+        near_delta_ODs = -np.log10(near_pd_reads.T / near_pd_reads[:, 0])  # normalize PD reads to first sample
+        far_delta_ODs = -np.log10(far_pd_reads.T / far_pd_reads[:, 0])
+
+        # calculate hb concentrations.
+        concs_near = 1000 * (A_near_inv) @ near_delta_ODs.T
+        concs_far = 1000 * (A_far_inv) @ far_delta_ODs.T
+
+        return concs_near, concs_far
+    
+    def calc_gradients(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray) -&gt; np.ndarray:
+        d = self.__params[&#34;sd_distance&#34;]
+        abs_off = self.__params[&#34;abs_offsets&#34;]
+        OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
+        OD_grads = OD_grads.T + abs_off / (d[1] - d[0])
+        return OD_grads
+
+
+    def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray, svd_clean=False) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Calculates TOI using coefficients similar to the PLM.
+
+        Function inputs:
+        1. Ambient subtracted near PD reads
+        2. Ambient subtracted far PD reads
+
+        Function outputs:
+            toi
+        &#34;&#34;&#34;
+
+        OD_grads = self.calc_gradients(near_pd_reads, far_pd_reads)
+        
+        if svd_clean:
+            OD_grads, _ = self.svd_clean(OD_grads)
+            OD_grads = OD_grads.T
+
+        h = 4.6E-4  # Wavelength dependence of scattering (1/nm);
+        usp = 1 - h * self.__params[&#34;wavelengths&#34;]
+
+        # step 3: Estimate absorbance coefficient
+        ua = 1 / (3 * usp) * (np.log(10) * OD_grads - 2 / np.mean(self.__params[&#34;sd_distance&#34;])) ** 2
+
+        # step 4: estimate hb concentrations
+        hb_concs = np.linalg.pinv(self.__params[&#34;e_coef&#34;]) @ ua.T
+        hb_concs = np.transpose(hb_concs)
+
+        # step 5: calculate TOI:
+        toi = hb_concs[:, 0] / np.sum(hb_concs, 1) * 100
+
+        return toi
+
+
+    def get_pd_reads(df) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Get PD reads from Neurokey dataframe returned by NKY-utils.
+        &#34;&#34;&#34;
+        d = np.empty((len(df), 12))
+        d[:, :5] = df.iloc[:, 1:6].to_numpy()
+        d[:, 5] = df.iloc[:, 11].to_numpy()
+        d[:, 6:11] = df.iloc[:, 6:11].to_numpy()
+        d[:, 11] = df.iloc[:, 12].to_numpy()
+        return d
+
+
+    def svd(self, data: np.ndarray, full_matrices: bool=False) -&gt; list[np.ndarray]:
+        &#34;&#34;&#34;
+        Perform Singluar Value Decomposition on NIRS data
+
+        Arguments
+        ---------
+            data: np.ndarray (shape=(channels, observations))
+                The data to be decomposed.
+
+            full_matrices: boolean (default=False)
+                Whether to calculate the full U and V matrices (which is rarely a good idea!)
+
+        Returns
+        -------
+            (U,S,V): tuple
+                The matrices resulting from the SVD as a tuple. For more info, lookup numpy.linalg.svd.
+        &#34;&#34;&#34;
+
+        # First check whether the data is the correct type
+        if type(data) is not np.ndarray:
+            raise Exception(&#39;data must be a numpy array&#39;)
+        
+        # if someone accidentally passes data with observations as rows, transpose
+        if np.argmax(data.shape) == 0:
+            data = data.T
+
+        # Now do the SVD and return the result
+        return np.linalg.svd(data, full_matrices=full_matrices)
+    
+
+    def ica(data):
+        &#34;Perform an Independent Component Analysis based decomposition on raw NIRS&#34;
+        return &#34;Not Implemented&#34;
+
+    def svd_clean(self, data, return_noise=True):
+        &#34;Clean raw NIRS 5WL data with SVD, return cleaned raw data&#34;
+
+        if data.shape[0] &lt; data.shape[1]:
+            data = data.T
+
+        raw_data = data
+        raw_data_means = np.mean(raw_data, axis=0)
+        raw_data_mc = raw_data - raw_data_means
+
+        u,s,v = np.linalg.svd(raw_data_mc.T, full_matrices=False)
+        
+        noise = np.mean(u[:,0])*v[0,:]
+        rec = u[:,1:-1] @ np.diag(s[1:-1]) @ v[1:-1,:]
+        rec = rec.T
+        clean_data = (rec - rec[0,:] + raw_data[0,:]).T
+
+        if return_noise:
+            return clean_data, noise
+        else:
+            return clean_data
+        
+
+    def clean_hbc_toi(self, data): #TODO: Take 5WL data and return cleaned data
+        &#34;Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI&#34;
+
+        near, far = self.subtract_ambient(data)
+        near_clean, _ = self.svd_clean(near)
+        far_clean, _ = self.svd_clean(far)
+
+        near_hb_clean, far_hb_clean = self.calc_hb_concs(near_clean, far_clean)
+        toi_clean = self.calc_toi(near_clean, far_clean, svd_clean=False)
+
+        return near_hb_clean, far_hb_clean, toi_clean
+
+
+
+if __name__ == &#34;__main__&#34;:
+    import pickle
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    with open(&#39;src/pynirs/combined_data.pkl&#39;, &#39;rb&#39;) as f:
+        data = pickle.load(f)
+    
+    cols = [f&#34;c NIRS 1.channel[{i}].1&#34; for i in range(12)]
+    pd_reads = data[cols].to_numpy().T
+
+    hb = HbConv(pd_reads)
+    plt.subplots(2,1, sharex=True, sharey=True)
+    plt.subplot(211)
+    plt.plot(hb.observed[&#34;toi&#34;])
+    plt.subplot(212)
+    plt.plot(hb.cleaned[&#34;toi&#34;])
+    plt.show()
+    print(&#34;done&#34;)</code></pre>
 </details>
 </section>
 <section>
@@ -126,10 +333,298 @@ def get_pd_reads(df):
 <section>
 </section>
 <section>
-<h2 class="section-title" id="header-functions">Functions</h2>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
-<dt id="pynirs.hb_conv.calc_hb_concs"><code class="name flex">
-<span>def <span class="ident">calc_hb_concs</span></span>(<span>near_pd_reads, far_pd_reads)</span>
+<dt id="pynirs.hb_conv.HbConv"><code class="flex name class">
+<span>class <span class="ident">HbConv</span></span>
+<span>(</span><span>data: numpy.ndarray = None, svd_clean: bool = True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.</p>
+<h2 id="parameters">Parameters</h2>
+<pre><code>data: np.ndarray
+    The raw data as a 12-channel matrix with each channel as a column vector
+svd_clean: bool
+    Whether or not to apply the SVD cleaning on the data
+</code></pre>
+<h2 id="attributes">Attributes</h2>
+<pre><code>observed: dict
+    A dictionary of data with the raw and converted data as was recorded.
+
+    raw_data: np.ndarray (shape=(12,nobs))
+        The raw absorbance data
+
+    hb_concs: np.ndarray
+    The predicted values based on the x-data, slope and intercept
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class HbConv:
+    def __init__(self, data: np.ndarray = None, svd_clean: bool = True):
+        &#34;&#34;&#34;
+        Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.
+
+        Parameters
+        ----------
+            data: np.ndarray
+                The raw data as a 12-channel matrix with each channel as a column vector
+            svd_clean: bool
+                Whether or not to apply the SVD cleaning on the data
+
+        Attributes
+        ----------
+            observed: dict
+                A dictionary of data with the raw and converted data as was recorded. 
+                
+                raw_data: np.ndarray (shape=(12,nobs))
+                    The raw absorbance data
+
+                hb_concs: np.ndarray
+                The predicted values based on the x-data, slope and intercept
+        
+        &#34;&#34;&#34;
+       
+        #The coefficients for conversion of optical density to Hb-concentrations.
+        self.__params = self.__gen_params()
+        
+        # If data was passed during instantiation
+        if data is not None:
+            # Convert to hb-concs and toi
+            abs_data = data
+            hbc_near, hbc_far, toi = self.hbc_from_abs(abs_data)
+            obs = dict({&#34;raw_abs&#34;:abs_data, &#34;hbc_near&#34;: hbc_near, &#34;hbc_far&#34;: hbc_far, &#34;toi&#34;: toi})
+            self.observed = obs
+
+        if svd_clean:
+            # Clean the data
+            near, far = self.subtract_ambient(abs_data)
+            abs_pre_clean = np.vstack((near, far))
+            abs_post_clean, noise = self.svd_clean(abs_pre_clean)
+            near_clean, far_clean = abs_post_clean[:5, :], abs_post_clean[5:, :]
+            hbc_near_clean, hbc_far_clean = self.calc_hb_concs(near_clean, far_clean)
+            toi_abs = self.calc_toi(near_clean, far_clean)
+            toi_ods = self.calc_toi(near, far, svd_clean=True)
+            clean = {&#34;raw_abs&#34;: np.vstack((near_clean, far_clean)),
+                     &#34;hbc_near&#34;: hbc_near_clean,
+                     &#34;hbc_far&#34;: hbc_far_clean,
+                     &#34;toi_abs&#34;: toi_abs,
+                     &#34;toi_ods&#34;: toi_ods}
+            self.cleaned = clean
+
+
+    def __gen_params(self) -&gt; dict:
+        &#34;Generate a dictionary of params used in calculating Hb-concs and TOI.&#34;
+        e_coef = np.array([[0.3194, 2.5713],
+                            [0.4383, 1.3029],
+                            [0.9291, 0.7987],
+                            [1.1596, 0.7861],
+                            [1.3514, 0.8968]])
+        
+        d = np.array([1, 1.6], dtype=np.float16) # Source detector distance per channel
+        wavelenths = np.array([680, 730, 810, 850, 910], dtype=np.float16) # Wavelengths
+        dpf = 6 # Differential path length factor
+    
+        # Generate matrices for conversion to Hb-concentration changes
+        A_near = e_coef * d[0] * dpf
+        A_near_inv  = np.linalg.pinv(A_near)
+
+        A_far = e_coef * d[1] * dpf
+        A_far_inv  = np.linalg.pinv(A_far)
+
+        params = {&#34;e_coef&#34;: e_coef,
+                  &#34;wavelengths&#34;: wavelenths,
+                  &#34;dpf&#34;: dpf,
+                  &#34;sd_distance&#34;: d,
+                  &#34;A_near_inv&#34;: A_near_inv,
+                  &#34;A_far_inv&#34;: A_far_inv,
+                  &#34;abs_offsets&#34;: np.array([0.62517, 0.81141, 0.82149, 0.81788, 0.67964])}  # calibration coefficients
+        
+        return params
+    
+    
+    def get_params(self) -&gt; dict:
+        &#34;Returns the dictionary of parameters used for Hb-conc and TOI calculation&#34;
+        return self.__params
+
+    
+    def hbc_from_abs(self, abs_data: np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+        &#34;&#34;&#34;
+        Perform Singluar Value Decomposition on NIRS data
+
+        Arguments
+        ---------
+            abs_data: np.ndarray
+                The raw absorbance data (before ambient subtraction). Shape is nchan x nobs
+
+        Returns
+        -------
+            near_hbc: np.ndarray (shape=(4, nobs))
+                near hb-concentration changes
+
+            far_hbc: np.ndarray (shape=(4, nobs))
+                far hb-concentration changes
+
+            toi: np.ndarray
+                The calculated toi values
+        &#34;&#34;&#34;
+        near, far = self.subtract_ambient(abs_data)
+        near_hbc, far_hbc = self.calc_hb_concs(near, far)
+        toi = self.calc_toi(near, far)
+        return near_hbc, far_hbc, toi
+
+    
+    def subtract_ambient(self, pd_reads: np.ndarray) -&gt; np.ndarray:
+        near_vals = pd_reads[:5, :] - pd_reads[5, :]
+        far_vals = pd_reads[6:11, :] - pd_reads[11, :]
+        return near_vals, far_vals
+
+
+    def calc_hb_concs(self, near_pd_reads: np.ndarray, far_pd_reads:np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+
+        A_near_inv = self.__params[&#34;A_near_inv&#34;]
+        A_far_inv = self.__params[&#34;A_far_inv&#34;]
+
+        # calculate the relative changes in OD
+        near_delta_ODs = -np.log10(near_pd_reads.T / near_pd_reads[:, 0])  # normalize PD reads to first sample
+        far_delta_ODs = -np.log10(far_pd_reads.T / far_pd_reads[:, 0])
+
+        # calculate hb concentrations.
+        concs_near = 1000 * (A_near_inv) @ near_delta_ODs.T
+        concs_far = 1000 * (A_far_inv) @ far_delta_ODs.T
+
+        return concs_near, concs_far
+    
+    def calc_gradients(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray) -&gt; np.ndarray:
+        d = self.__params[&#34;sd_distance&#34;]
+        abs_off = self.__params[&#34;abs_offsets&#34;]
+        OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
+        OD_grads = OD_grads.T + abs_off / (d[1] - d[0])
+        return OD_grads
+
+
+    def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray, svd_clean=False) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Calculates TOI using coefficients similar to the PLM.
+
+        Function inputs:
+        1. Ambient subtracted near PD reads
+        2. Ambient subtracted far PD reads
+
+        Function outputs:
+            toi
+        &#34;&#34;&#34;
+
+        OD_grads = self.calc_gradients(near_pd_reads, far_pd_reads)
+        
+        if svd_clean:
+            OD_grads, _ = self.svd_clean(OD_grads)
+            OD_grads = OD_grads.T
+
+        h = 4.6E-4  # Wavelength dependence of scattering (1/nm);
+        usp = 1 - h * self.__params[&#34;wavelengths&#34;]
+
+        # step 3: Estimate absorbance coefficient
+        ua = 1 / (3 * usp) * (np.log(10) * OD_grads - 2 / np.mean(self.__params[&#34;sd_distance&#34;])) ** 2
+
+        # step 4: estimate hb concentrations
+        hb_concs = np.linalg.pinv(self.__params[&#34;e_coef&#34;]) @ ua.T
+        hb_concs = np.transpose(hb_concs)
+
+        # step 5: calculate TOI:
+        toi = hb_concs[:, 0] / np.sum(hb_concs, 1) * 100
+
+        return toi
+
+
+    def get_pd_reads(df) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Get PD reads from Neurokey dataframe returned by NKY-utils.
+        &#34;&#34;&#34;
+        d = np.empty((len(df), 12))
+        d[:, :5] = df.iloc[:, 1:6].to_numpy()
+        d[:, 5] = df.iloc[:, 11].to_numpy()
+        d[:, 6:11] = df.iloc[:, 6:11].to_numpy()
+        d[:, 11] = df.iloc[:, 12].to_numpy()
+        return d
+
+
+    def svd(self, data: np.ndarray, full_matrices: bool=False) -&gt; list[np.ndarray]:
+        &#34;&#34;&#34;
+        Perform Singluar Value Decomposition on NIRS data
+
+        Arguments
+        ---------
+            data: np.ndarray (shape=(channels, observations))
+                The data to be decomposed.
+
+            full_matrices: boolean (default=False)
+                Whether to calculate the full U and V matrices (which is rarely a good idea!)
+
+        Returns
+        -------
+            (U,S,V): tuple
+                The matrices resulting from the SVD as a tuple. For more info, lookup numpy.linalg.svd.
+        &#34;&#34;&#34;
+
+        # First check whether the data is the correct type
+        if type(data) is not np.ndarray:
+            raise Exception(&#39;data must be a numpy array&#39;)
+        
+        # if someone accidentally passes data with observations as rows, transpose
+        if np.argmax(data.shape) == 0:
+            data = data.T
+
+        # Now do the SVD and return the result
+        return np.linalg.svd(data, full_matrices=full_matrices)
+    
+
+    def ica(data):
+        &#34;Perform an Independent Component Analysis based decomposition on raw NIRS&#34;
+        return &#34;Not Implemented&#34;
+
+    def svd_clean(self, data, return_noise=True):
+        &#34;Clean raw NIRS 5WL data with SVD, return cleaned raw data&#34;
+
+        if data.shape[0] &lt; data.shape[1]:
+            data = data.T
+
+        raw_data = data
+        raw_data_means = np.mean(raw_data, axis=0)
+        raw_data_mc = raw_data - raw_data_means
+
+        u,s,v = np.linalg.svd(raw_data_mc.T, full_matrices=False)
+        
+        noise = np.mean(u[:,0])*v[0,:]
+        rec = u[:,1:-1] @ np.diag(s[1:-1]) @ v[1:-1,:]
+        rec = rec.T
+        clean_data = (rec - rec[0,:] + raw_data[0,:]).T
+
+        if return_noise:
+            return clean_data, noise
+        else:
+            return clean_data
+        
+
+    def clean_hbc_toi(self, data): #TODO: Take 5WL data and return cleaned data
+        &#34;Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI&#34;
+
+        near, far = self.subtract_ambient(data)
+        near_clean, _ = self.svd_clean(near)
+        far_clean, _ = self.svd_clean(far)
+
+        near_hb_clean, far_hb_clean = self.calc_hb_concs(near_clean, far_clean)
+        toi_clean = self.calc_toi(near_clean, far_clean, svd_clean=False)
+
+        return near_hb_clean, far_hb_clean, toi_clean</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="pynirs.hb_conv.HbConv.calc_gradients"><code class="name flex">
+<span>def <span class="ident">calc_gradients</span></span>(<span>self, near_pd_reads: numpy.ndarray, far_pd_reads: numpy.ndarray) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -137,31 +632,41 @@ def get_pd_reads(df):
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def calc_hb_concs(near_pd_reads, far_pd_reads):
-    # Declare constants
-    DPF = 6  # differential pathlength factor (6 is default in PLM).
-    wls = (680, 730, 810, 850, 910)  # wavelength of each LED in nm
-    d = [1, 1.6]  # specify source-detector positions
+<pre><code class="python">def calc_gradients(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray) -&gt; np.ndarray:
+    d = self.__params[&#34;sd_distance&#34;]
+    abs_off = self.__params[&#34;abs_offsets&#34;]
+    OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
+    OD_grads = OD_grads.T + abs_off / (d[1] - d[0])
+    return OD_grads</code></pre>
+</details>
+</dd>
+<dt id="pynirs.hb_conv.HbConv.calc_hb_concs"><code class="name flex">
+<span>def <span class="ident">calc_hb_concs</span></span>(<span>self, near_pd_reads: numpy.ndarray, far_pd_reads: numpy.ndarray) ‑> list[numpy.ndarray, numpy.ndarray]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calc_hb_concs(self, near_pd_reads: np.ndarray, far_pd_reads:np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
 
-    e_coef = E_COEFFS
+    A_near_inv = self.__params[&#34;A_near_inv&#34;]
+    A_far_inv = self.__params[&#34;A_far_inv&#34;]
 
-    # Step 1: calculate the relative changes in OD
+    # calculate the relative changes in OD
     near_delta_ODs = -np.log10(near_pd_reads.T / near_pd_reads[:, 0])  # normalize PD reads to first sample
     far_delta_ODs = -np.log10(far_pd_reads.T / far_pd_reads[:, 0])
 
-    # step 2: Scale the extinction coefficient wavelength by assumed pathlength
-    A_near = e_coef * d[0] * DPF  # A is e_coef times by assumed pathlength
-    A_far = e_coef * d[1] * DPF
-
-    # step 3: calculate hb concentrations.
-    concs_near = 1000 * np.linalg.pinv(A_near) @ near_delta_ODs.T
-    concs_far = 1000 * np.linalg.pinv(A_far) @ far_delta_ODs.T
+    # calculate hb concentrations.
+    concs_near = 1000 * (A_near_inv) @ near_delta_ODs.T
+    concs_far = 1000 * (A_far_inv) @ far_delta_ODs.T
 
     return concs_near, concs_far</code></pre>
 </details>
 </dd>
-<dt id="pynirs.hb_conv.calc_toi"><code class="name flex">
-<span>def <span class="ident">calc_toi</span></span>(<span>near_pd_reads, far_pd_reads)</span>
+<dt id="pynirs.hb_conv.HbConv.calc_toi"><code class="name flex">
+<span>def <span class="ident">calc_toi</span></span>(<span>self, near_pd_reads: numpy.ndarray, far_pd_reads: numpy.ndarray, svd_clean=False) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Calculates TOI using coefficients similar to the PLM.</p>
@@ -174,7 +679,7 @@ toi</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def calc_toi(near_pd_reads, far_pd_reads):
+<pre><code class="python">def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray, svd_clean=False) -&gt; np.ndarray:
     &#34;&#34;&#34;
     Calculates TOI using coefficients similar to the PLM.
 
@@ -185,25 +690,21 @@ toi</p></div>
     Function outputs:
         toi
     &#34;&#34;&#34;
-    # declare constants
-    h = 0.00046  # Wavelength dependence of scattering (1/nm);
-    d = np.array([1, 1.6])  # source-detector seperations
-    wls = np.array([680, 730, 810, 850, 910])  # LED wavelengths in nm
-    abs_offsets = np.array([0.62517, 0.81141, 0.82149, 0.81788, 0.67964])  # calibration coefficients
-    e_coef = E_COEFFS
 
-    # Step 1: Estimate the optical density gradient.
-    OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
-    OD_grads = OD_grads.T + abs_offsets / (d[1] - d[0])
+    OD_grads = self.calc_gradients(near_pd_reads, far_pd_reads)
+    
+    if svd_clean:
+        OD_grads, _ = self.svd_clean(OD_grads)
+        OD_grads = OD_grads.T
 
-    # Step 2: estimate the effect of the wavelength dependence of scattering
-    usp = 1 - h * wls
+    h = 4.6E-4  # Wavelength dependence of scattering (1/nm);
+    usp = 1 - h * self.__params[&#34;wavelengths&#34;]
 
     # step 3: Estimate absorbance coefficient
-    ua = 1 / (3 * usp) * (np.log(10) * OD_grads - 2 / np.mean(d)) ** 2
+    ua = 1 / (3 * usp) * (np.log(10) * OD_grads - 2 / np.mean(self.__params[&#34;sd_distance&#34;])) ** 2
 
     # step 4: estimate hb concentrations
-    hb_concs = np.matmul(np.linalg.pinv(e_coef), np.transpose(ua))
+    hb_concs = np.linalg.pinv(self.__params[&#34;e_coef&#34;]) @ ua.T
     hb_concs = np.transpose(hb_concs)
 
     # step 5: calculate TOI:
@@ -212,8 +713,44 @@ toi</p></div>
     return toi</code></pre>
 </details>
 </dd>
-<dt id="pynirs.hb_conv.get_pd_reads"><code class="name flex">
-<span>def <span class="ident">get_pd_reads</span></span>(<span>df)</span>
+<dt id="pynirs.hb_conv.HbConv.clean_hbc_toi"><code class="name flex">
+<span>def <span class="ident">clean_hbc_toi</span></span>(<span>self, data)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def clean_hbc_toi(self, data): #TODO: Take 5WL data and return cleaned data
+    &#34;Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI&#34;
+
+    near, far = self.subtract_ambient(data)
+    near_clean, _ = self.svd_clean(near)
+    far_clean, _ = self.svd_clean(far)
+
+    near_hb_clean, far_hb_clean = self.calc_hb_concs(near_clean, far_clean)
+    toi_clean = self.calc_toi(near_clean, far_clean, svd_clean=False)
+
+    return near_hb_clean, far_hb_clean, toi_clean</code></pre>
+</details>
+</dd>
+<dt id="pynirs.hb_conv.HbConv.get_params"><code class="name flex">
+<span>def <span class="ident">get_params</span></span>(<span>self) ‑> dict</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns the dictionary of parameters used for Hb-conc and TOI calculation</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_params(self) -&gt; dict:
+    &#34;Returns the dictionary of parameters used for Hb-conc and TOI calculation&#34;
+    return self.__params</code></pre>
+</details>
+</dd>
+<dt id="pynirs.hb_conv.HbConv.get_pd_reads"><code class="name flex">
+<span>def <span class="ident">get_pd_reads</span></span>(<span>df) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Get PD reads from Neurokey dataframe returned by NKY-utils.</p></div>
@@ -221,7 +758,7 @@ toi</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_pd_reads(df):
+<pre><code class="python">def get_pd_reads(df) -&gt; np.ndarray:
     &#34;&#34;&#34;
     Get PD reads from Neurokey dataframe returned by NKY-utils.
     &#34;&#34;&#34;
@@ -233,8 +770,71 @@ toi</p></div>
     return d</code></pre>
 </details>
 </dd>
-<dt id="pynirs.hb_conv.subtract_ambient"><code class="name flex">
-<span>def <span class="ident">subtract_ambient</span></span>(<span>pd_reads: <built-in function array>)</span>
+<dt id="pynirs.hb_conv.HbConv.hbc_from_abs"><code class="name flex">
+<span>def <span class="ident">hbc_from_abs</span></span>(<span>self, abs_data: numpy.ndarray) ‑> list[numpy.ndarray, numpy.ndarray]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform Singluar Value Decomposition on NIRS data</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>abs_data: np.ndarray
+    The raw absorbance data (before ambient subtraction). Shape is nchan x nobs
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>near_hbc: np.ndarray (shape=(4, nobs))
+    near hb-concentration changes
+
+far_hbc: np.ndarray (shape=(4, nobs))
+    far hb-concentration changes
+
+toi: np.ndarray
+    The calculated toi values
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def hbc_from_abs(self, abs_data: np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+    &#34;&#34;&#34;
+    Perform Singluar Value Decomposition on NIRS data
+
+    Arguments
+    ---------
+        abs_data: np.ndarray
+            The raw absorbance data (before ambient subtraction). Shape is nchan x nobs
+
+    Returns
+    -------
+        near_hbc: np.ndarray (shape=(4, nobs))
+            near hb-concentration changes
+
+        far_hbc: np.ndarray (shape=(4, nobs))
+            far hb-concentration changes
+
+        toi: np.ndarray
+            The calculated toi values
+    &#34;&#34;&#34;
+    near, far = self.subtract_ambient(abs_data)
+    near_hbc, far_hbc = self.calc_hb_concs(near, far)
+    toi = self.calc_toi(near, far)
+    return near_hbc, far_hbc, toi</code></pre>
+</details>
+</dd>
+<dt id="pynirs.hb_conv.HbConv.ica"><code class="name flex">
+<span>def <span class="ident">ica</span></span>(<span>data)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform an Independent Component Analysis based decomposition on raw NIRS</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ica(data):
+    &#34;Perform an Independent Component Analysis based decomposition on raw NIRS&#34;
+    return &#34;Not Implemented&#34;</code></pre>
+</details>
+</dd>
+<dt id="pynirs.hb_conv.HbConv.subtract_ambient"><code class="name flex">
+<span>def <span class="ident">subtract_ambient</span></span>(<span>self, pd_reads: numpy.ndarray) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -242,16 +842,97 @@ toi</p></div>
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def subtract_ambient(pd_reads: np.array):
+<pre><code class="python">def subtract_ambient(self, pd_reads: np.ndarray) -&gt; np.ndarray:
     near_vals = pd_reads[:5, :] - pd_reads[5, :]
     far_vals = pd_reads[6:11, :] - pd_reads[11, :]
-
     return near_vals, far_vals</code></pre>
 </details>
 </dd>
+<dt id="pynirs.hb_conv.HbConv.svd"><code class="name flex">
+<span>def <span class="ident">svd</span></span>(<span>self, data: numpy.ndarray, full_matrices: bool = False) ‑> list[numpy.ndarray]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Perform Singluar Value Decomposition on NIRS data</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>data: np.ndarray (shape=(channels, observations))
+    The data to be decomposed.
+
+full_matrices: boolean (default=False)
+    Whether to calculate the full U and V matrices (which is rarely a good idea!)
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>(U,S,V): tuple
+    The matrices resulting from the SVD as a tuple. For more info, lookup numpy.linalg.svd.
+</code></pre></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def svd(self, data: np.ndarray, full_matrices: bool=False) -&gt; list[np.ndarray]:
+    &#34;&#34;&#34;
+    Perform Singluar Value Decomposition on NIRS data
+
+    Arguments
+    ---------
+        data: np.ndarray (shape=(channels, observations))
+            The data to be decomposed.
+
+        full_matrices: boolean (default=False)
+            Whether to calculate the full U and V matrices (which is rarely a good idea!)
+
+    Returns
+    -------
+        (U,S,V): tuple
+            The matrices resulting from the SVD as a tuple. For more info, lookup numpy.linalg.svd.
+    &#34;&#34;&#34;
+
+    # First check whether the data is the correct type
+    if type(data) is not np.ndarray:
+        raise Exception(&#39;data must be a numpy array&#39;)
+    
+    # if someone accidentally passes data with observations as rows, transpose
+    if np.argmax(data.shape) == 0:
+        data = data.T
+
+    # Now do the SVD and return the result
+    return np.linalg.svd(data, full_matrices=full_matrices)</code></pre>
+</details>
+</dd>
+<dt id="pynirs.hb_conv.HbConv.svd_clean"><code class="name flex">
+<span>def <span class="ident">svd_clean</span></span>(<span>self, data, return_noise=True)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Clean raw NIRS 5WL data with SVD, return cleaned raw data</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def svd_clean(self, data, return_noise=True):
+    &#34;Clean raw NIRS 5WL data with SVD, return cleaned raw data&#34;
+
+    if data.shape[0] &lt; data.shape[1]:
+        data = data.T
+
+    raw_data = data
+    raw_data_means = np.mean(raw_data, axis=0)
+    raw_data_mc = raw_data - raw_data_means
+
+    u,s,v = np.linalg.svd(raw_data_mc.T, full_matrices=False)
+    
+    noise = np.mean(u[:,0])*v[0,:]
+    rec = u[:,1:-1] @ np.diag(s[1:-1]) @ v[1:-1,:]
+    rec = rec.T
+    clean_data = (rec - rec[0,:] + raw_data[0,:]).T
+
+    if return_noise:
+        return clean_data, noise
+    else:
+        return clean_data</code></pre>
+</details>
+</dd>
 </dl>
-</section>
-<section>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -265,12 +946,24 @@ toi</p></div>
 <li><code><a title="pynirs" href="index.html">pynirs</a></code></li>
 </ul>
 </li>
-<li><h3><a href="#header-functions">Functions</a></h3>
-<ul class="">
-<li><code><a title="pynirs.hb_conv.calc_hb_concs" href="#pynirs.hb_conv.calc_hb_concs">calc_hb_concs</a></code></li>
-<li><code><a title="pynirs.hb_conv.calc_toi" href="#pynirs.hb_conv.calc_toi">calc_toi</a></code></li>
-<li><code><a title="pynirs.hb_conv.get_pd_reads" href="#pynirs.hb_conv.get_pd_reads">get_pd_reads</a></code></li>
-<li><code><a title="pynirs.hb_conv.subtract_ambient" href="#pynirs.hb_conv.subtract_ambient">subtract_ambient</a></code></li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="pynirs.hb_conv.HbConv" href="#pynirs.hb_conv.HbConv">HbConv</a></code></h4>
+<ul class="two-column">
+<li><code><a title="pynirs.hb_conv.HbConv.calc_gradients" href="#pynirs.hb_conv.HbConv.calc_gradients">calc_gradients</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.calc_hb_concs" href="#pynirs.hb_conv.HbConv.calc_hb_concs">calc_hb_concs</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.calc_toi" href="#pynirs.hb_conv.HbConv.calc_toi">calc_toi</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.clean_hbc_toi" href="#pynirs.hb_conv.HbConv.clean_hbc_toi">clean_hbc_toi</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.get_params" href="#pynirs.hb_conv.HbConv.get_params">get_params</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.get_pd_reads" href="#pynirs.hb_conv.HbConv.get_pd_reads">get_pd_reads</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.hbc_from_abs" href="#pynirs.hb_conv.HbConv.hbc_from_abs">hbc_from_abs</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.ica" href="#pynirs.hb_conv.HbConv.ica">ica</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.subtract_ambient" href="#pynirs.hb_conv.HbConv.subtract_ambient">subtract_ambient</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.svd" href="#pynirs.hb_conv.HbConv.svd">svd</a></code></li>
+<li><code><a title="pynirs.hb_conv.HbConv.svd_clean" href="#pynirs.hb_conv.HbConv.svd_clean">svd_clean</a></code></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

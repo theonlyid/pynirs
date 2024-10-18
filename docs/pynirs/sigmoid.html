@@ -61,14 +61,6 @@ class Sigmoid:
     params: Params
         An object with the best fit parameters and their statistics. Type help(Params) for more info.
 
-    params : dict
-        The parameters returned by the fit() method, along with their covariance matrix. Has the folling attributes.
-
-            means (list[float]): the mean values of the parameters
-            cov (np.ndarray): the covariance matrix of the paramters
-            rsquare (float): the R-square for the fit
-            yhat (np.ndarray): the y-values predicted from the fit params for the x_data provided
-
     &#34;&#34;&#34;
 
     def __init__(self, x_data: np.ndarray, y_data: np.ndarray, fs = 1):
@@ -88,13 +80,13 @@ class Sigmoid:
         &#34;&#34;&#34;
 
         self.x_data = x_data
-        self.y_data = y_data
+        self.y_data = y_data - y_data[0]
         self.fs = fs
-        self.params = self.fit(x_data=x_data, y_data=y_data, plot=False)
-        self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1])
+        self.params = self.fit(x_data=x_data, y_data=y_data, plot=True)
+        self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1], scale=self.params.means[2])
         print(self)
 
-    def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=True) -&gt; None:
+    def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=False) -&gt; Param:
         &#34;&#34;&#34;
         Fit sigmoid curve to data. If no data is passed, it will use the x and y data stored in the object.
 
@@ -123,23 +115,24 @@ class Sigmoid:
              x_data = self.x_data
              y_data = self.y_data
     
-        y_obs = y_data - y_data[0]
-        y_obs = np.cumsum(y_obs)/np.sum(y_obs)
-        p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2], dtype=np.float64), maxfev=1_000_000_000)
-        y_hat = self.predict(x_data, p_opt[0], p_opt[1])
+        y_obs = y_data
+        # y_obs = np.cumsum(y_obs)/np.sum(y_obs)
+        # y_obs = y_data
+        p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2, 1], dtype=np.float64), maxfev=1_000_000_000)
+        y_hat = self.predict(x_data, p_opt[0], p_opt[1], p_opt[2])
         rsquare = 1 - (np.var(y_obs - y_hat)/np.var(y_obs))
 
         if plot:
             plt.figure()
             plt.plot(x_data, y_obs)
-            plt.plot(x_data, y_hat)
+            plt.plot(x_data, y_hat, &#34;--&#34;)
             plt.grid()
             plt.title(f&#34;Fit results: R^2={rsquare:0.2f}&#34;)
             plt.legend([&#39;observed&#39;, &#39;fit&#39;])
 
         return Param(p_opt, p_var, rsquare)
 
-    def predict(self, x_data: np.ndarray, slope: float, intercept: float):
+    def predict(self, x_data: np.ndarray, slope: float, intercept: float, scale: float = 1) -&gt; np.ndarray:
         &#34;&#34;&#34;
         Predict the y-values of a sigmoid curve for the x_data and params provided.
 
@@ -158,13 +151,13 @@ class Sigmoid:
                 The predicted values based on the x-data, slope and intercept
         
         &#34;&#34;&#34;
-        y = 1/(1 + np.exp(-slope*(x_data - intercept)))
+        y = (1/(1 + np.exp(-slope*(x_data - intercept)))) * scale
         return y
     
     def __repr__(self):
             slope = self.params.means[0]
             intercept = self.params.means[1]
-            repr = f&#34;SigmoidFit(slope:{slope:0.2f}, intercept:{intercept:0.2f})&#34;
+            repr = f&#34;SigmoidFit(slope:{slope:0.2f}, intercept:{intercept:0.2f}, scale:{self.params.means[2]:0.2f})&#34;
             return repr
     
 
@@ -174,13 +167,13 @@ class Sigmoid:
 
 if __name__ == &#34;__main__&#34;:
 
-    x = np.arange(100)
-    slope = 1
+    x = np.arange(-100, 100)
+    slope = 0.1
     intercept = 50
-    y = 1/(1 + np.exp(-slope*(x-intercept)))
+    scale = 10
+    y = (1/(1 + np.exp(-slope*(x-intercept)))) * scale
 
-    sig = Sigmoid(x, y)
-    print(sig)</code></pre>
+    sig = Sigmoid(x, y)</code></pre>
 </details>
 </section>
 <section>
@@ -208,13 +201,6 @@ if __name__ == &#34;__main__&#34;:
 <dd>The predicted y-values based on the best-fit parameters.</dd>
 <dt><strong><code>params</code></strong> :&ensp;<code>Params</code></dt>
 <dd>An object with the best fit parameters and their statistics. Type help(Params) for more info.</dd>
-<dt><strong><code>params</code></strong> :&ensp;<code>dict</code></dt>
-<dd>The parameters returned by the fit() method, along with their covariance matrix. Has the folling attributes.<pre><code>means (list[float]): the mean values of the parameters
-cov (np.ndarray): the covariance matrix of the paramters
-rsquare (float): the R-square for the fit
-yhat (np.ndarray): the y-values predicted from the fit params for the x_data provided
-</code></pre>
-</dd>
 </dl>
 <p>Instantiates an object with the relevant x and y data. Will automatically fit a sigmoid to the data.</p>
 <h2 id="parameters">Parameters</h2>
@@ -251,14 +237,6 @@ fs : float
     params: Params
         An object with the best fit parameters and their statistics. Type help(Params) for more info.
 
-    params : dict
-        The parameters returned by the fit() method, along with their covariance matrix. Has the folling attributes.
-
-            means (list[float]): the mean values of the parameters
-            cov (np.ndarray): the covariance matrix of the paramters
-            rsquare (float): the R-square for the fit
-            yhat (np.ndarray): the y-values predicted from the fit params for the x_data provided
-
     &#34;&#34;&#34;
 
     def __init__(self, x_data: np.ndarray, y_data: np.ndarray, fs = 1):
@@ -278,13 +256,13 @@ fs : float
         &#34;&#34;&#34;
 
         self.x_data = x_data
-        self.y_data = y_data
+        self.y_data = y_data - y_data[0]
         self.fs = fs
-        self.params = self.fit(x_data=x_data, y_data=y_data, plot=False)
-        self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1])
+        self.params = self.fit(x_data=x_data, y_data=y_data, plot=True)
+        self.yhat = self.predict(x_data=x_data, slope=self.params.means[0], intercept=self.params.means[1], scale=self.params.means[2])
         print(self)
 
-    def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=True) -&gt; None:
+    def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=False) -&gt; Param:
         &#34;&#34;&#34;
         Fit sigmoid curve to data. If no data is passed, it will use the x and y data stored in the object.
 
@@ -313,23 +291,24 @@ fs : float
              x_data = self.x_data
              y_data = self.y_data
     
-        y_obs = y_data - y_data[0]
-        y_obs = np.cumsum(y_obs)/np.sum(y_obs)
-        p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2], dtype=np.float64), maxfev=1_000_000_000)
-        y_hat = self.predict(x_data, p_opt[0], p_opt[1])
+        y_obs = y_data
+        # y_obs = np.cumsum(y_obs)/np.sum(y_obs)
+        # y_obs = y_data
+        p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2, 1], dtype=np.float64), maxfev=1_000_000_000)
+        y_hat = self.predict(x_data, p_opt[0], p_opt[1], p_opt[2])
         rsquare = 1 - (np.var(y_obs - y_hat)/np.var(y_obs))
 
         if plot:
             plt.figure()
             plt.plot(x_data, y_obs)
-            plt.plot(x_data, y_hat)
+            plt.plot(x_data, y_hat, &#34;--&#34;)
             plt.grid()
             plt.title(f&#34;Fit results: R^2={rsquare:0.2f}&#34;)
             plt.legend([&#39;observed&#39;, &#39;fit&#39;])
 
         return Param(p_opt, p_var, rsquare)
 
-    def predict(self, x_data: np.ndarray, slope: float, intercept: float):
+    def predict(self, x_data: np.ndarray, slope: float, intercept: float, scale: float = 1) -&gt; np.ndarray:
         &#34;&#34;&#34;
         Predict the y-values of a sigmoid curve for the x_data and params provided.
 
@@ -348,13 +327,13 @@ fs : float
                 The predicted values based on the x-data, slope and intercept
         
         &#34;&#34;&#34;
-        y = 1/(1 + np.exp(-slope*(x_data - intercept)))
+        y = (1/(1 + np.exp(-slope*(x_data - intercept)))) * scale
         return y
     
     def __repr__(self):
             slope = self.params.means[0]
             intercept = self.params.means[1]
-            repr = f&#34;SigmoidFit(slope:{slope:0.2f}, intercept:{intercept:0.2f})&#34;
+            repr = f&#34;SigmoidFit(slope:{slope:0.2f}, intercept:{intercept:0.2f}, scale:{self.params.means[2]:0.2f})&#34;
             return repr
     
 
@@ -365,7 +344,7 @@ fs : float
 <h3>Methods</h3>
 <dl>
 <dt id="pynirs.sigmoid.Sigmoid.fit"><code class="name flex">
-<span>def <span class="ident">fit</span></span>(<span>self, x_data: numpy.ndarray = None, y_data: numpy.ndarray = None, plot=True) ‑> NoneType</span>
+<span>def <span class="ident">fit</span></span>(<span>self, x_data: numpy.ndarray = None, y_data: numpy.ndarray = None, plot=False) ‑> <a title="pynirs.nirs_types.Param" href="nirs_types.html#pynirs.nirs_types.Param">Param</a></span>
 </code></dt>
 <dd>
 <div class="desc"><p>Fit sigmoid curve to data. If no data is passed, it will use the x and y data stored in the object.</p>
@@ -392,7 +371,7 @@ yhat (np.ndarray): the y-values predicted from the fit params for the x_data pro
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=True) -&gt; None:
+<pre><code class="python">def fit(self, x_data: np.ndarray = None, y_data: np.ndarray = None, plot=False) -&gt; Param:
     &#34;&#34;&#34;
     Fit sigmoid curve to data. If no data is passed, it will use the x and y data stored in the object.
 
@@ -421,16 +400,17 @@ yhat (np.ndarray): the y-values predicted from the fit params for the x_data pro
          x_data = self.x_data
          y_data = self.y_data
 
-    y_obs = y_data - y_data[0]
-    y_obs = np.cumsum(y_obs)/np.sum(y_obs)
-    p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2], dtype=np.float64), maxfev=1_000_000_000)
-    y_hat = self.predict(x_data, p_opt[0], p_opt[1])
+    y_obs = y_data
+    # y_obs = np.cumsum(y_obs)/np.sum(y_obs)
+    # y_obs = y_data
+    p_opt, p_var = curve_fit(self.predict, x_data, y_obs, np.array([1, len(x_data)/2, 1], dtype=np.float64), maxfev=1_000_000_000)
+    y_hat = self.predict(x_data, p_opt[0], p_opt[1], p_opt[2])
     rsquare = 1 - (np.var(y_obs - y_hat)/np.var(y_obs))
 
     if plot:
         plt.figure()
         plt.plot(x_data, y_obs)
-        plt.plot(x_data, y_hat)
+        plt.plot(x_data, y_hat, &#34;--&#34;)
         plt.grid()
         plt.title(f&#34;Fit results: R^2={rsquare:0.2f}&#34;)
         plt.legend([&#39;observed&#39;, &#39;fit&#39;])
@@ -439,7 +419,7 @@ yhat (np.ndarray): the y-values predicted from the fit params for the x_data pro
 </details>
 </dd>
 <dt id="pynirs.sigmoid.Sigmoid.predict"><code class="name flex">
-<span>def <span class="ident">predict</span></span>(<span>self, x_data: numpy.ndarray, slope: float, intercept: float)</span>
+<span>def <span class="ident">predict</span></span>(<span>self, x_data: numpy.ndarray, slope: float, intercept: float, scale: float = 1) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Predict the y-values of a sigmoid curve for the x_data and params provided.</p>
@@ -459,7 +439,7 @@ intercept: float
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def predict(self, x_data: np.ndarray, slope: float, intercept: float):
+<pre><code class="python">def predict(self, x_data: np.ndarray, slope: float, intercept: float, scale: float = 1) -&gt; np.ndarray:
     &#34;&#34;&#34;
     Predict the y-values of a sigmoid curve for the x_data and params provided.
 
@@ -478,7 +458,7 @@ intercept: float
             The predicted values based on the x-data, slope and intercept
     
     &#34;&#34;&#34;
-    y = 1/(1 + np.exp(-slope*(x_data - intercept)))
+    y = (1/(1 + np.exp(-slope*(x_data - intercept)))) * scale
     return y</code></pre>
 </details>
 </dd>
