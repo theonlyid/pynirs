@@ -53,10 +53,17 @@ class HbConv:
         if svd_clean:
             # Clean the data
             near, far = self.subtract_ambient(abs_data)
-            near_clean, _ = self.svd_clean(near)
-            far_clean, _  = self.svd_clean(far)
-            hbc_near_clean, hbc_far_clean, toi_clean = self.clean_hbc_toi(abs_data)
-            clean = {"raw_abs": np.vstack((near_clean, far_clean)), "hbc_near": hbc_near_clean, "hbc_far": hbc_far_clean, "toi": toi_clean}
+            abs_pre_clean = np.vstack((near, far))
+            abs_post_clean, noise = self.svd_clean(abs_pre_clean)
+            near_clean, far_clean = abs_post_clean[:5, :], abs_post_clean[5:, :]
+            hbc_near_clean, hbc_far_clean = self.calc_hb_concs(near_clean, far_clean)
+            toi_abs = self.calc_toi(near_clean, far_clean)
+            toi_ods = self.calc_toi(near, far, svd_clean=True)
+            clean = {"raw_abs": np.vstack((near_clean, far_clean)),
+                     "hbc_near": hbc_near_clean,
+                     "hbc_far": hbc_far_clean,
+                     "toi_abs": toi_abs,
+                     "toi_ods": toi_ods}
             self.cleaned = clean
 
 
@@ -137,8 +144,8 @@ class HbConv:
         far_delta_ODs = -np.log10(far_pd_reads.T / far_pd_reads[:, 0])
 
         # calculate hb concentrations.
-        concs_near = (A_near_inv) @ near_delta_ODs.T
-        concs_far = (A_far_inv) @ far_delta_ODs.T
+        concs_near = 1000 * (A_near_inv) @ near_delta_ODs.T
+        concs_far = 1000 * (A_far_inv) @ far_delta_ODs.T
 
         return concs_near, concs_far
     
@@ -168,7 +175,6 @@ class HbConv:
             OD_grads, _ = self.svd_clean(OD_grads)
             OD_grads = OD_grads.T
 
-        print(OD_grads.shape)
         h = 4.6E-4  # Wavelength dependence of scattering (1/nm);
         usp = 1 - h * self.__params["wavelengths"]
 
@@ -281,7 +287,7 @@ if __name__ == "__main__":
     pd_reads = data[cols].to_numpy().T
 
     hb = HbConv(pd_reads)
-    plt.subplots(2,1)
+    plt.subplots(2,1, sharex=True, sharey=True)
     plt.subplot(211)
     plt.plot(hb.observed["toi"])
     plt.subplot(212)
