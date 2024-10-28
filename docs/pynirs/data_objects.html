@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.9.2" />
+<title>pynirs.data_objects API documentation</title>
+<meta name="description" content="This submodule contains the class definitions and methods for loading and working with NIRS experiments and events …" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>pynirs.data_objects</code></h1>
+</header>
+<section id="section-intro">
+<p>This submodule contains the class definitions and methods for loading and working with NIRS experiments and events.</p>
+<p>Author: Ali Zaidi
+Date: 20-June-2024</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+This submodule contains the class definitions and methods for loading and working with NIRS experiments and events.
+
+Author: Ali Zaidi
+Date: 20-June-2024
+&#34;&#34;&#34;
+
+import pandas as pd
+import numpy as np
+from scipy import signal, fft, stats
+from scipy.optimize import curve_fit
+import matplotlib.pyplot as plt
+import pickle
+import re
+
+
+class Experiment:
+    &#34;&#34;&#34;
+    A class for loading and manipulating timeseries data from a CSV file. Has methods to allow resampling, filtering, etc.
+    &#34;&#34;&#34;
+
+    def __init__(self, source, auto_resample=True, extract_ne=True, fs=100):
+        self._log = []
+        self.__log(&#34;Instantiating Experiment object&#34;)
+        self.fs = fs
+        self.filter_params = None
+        if isinstance(source, pd.DataFrame):
+            self.data, self.comments = self.from_dataframe(source)
+            self.filename = f&#34;{source}&#34;
+        else:
+            self.filename = source
+            self.data, self.comments = self.load_file(source)
+        self._data = self.data.copy()
+        if extract_ne:
+            self.extract_NE()
+        if auto_resample:
+            self.resample(1)
+
+    def __log(self, statement):
+        self._log.append(statement)
+        print(statement)
+
+    def get_log(self):
+        &#34;&#34;&#34;Returns the log of the experiment object&#34;&#34;&#34;
+        return self._log
+
+
+    def load_file(self, filename: str, repace_data=True) -&gt; list[pd.DataFrame]:
+        &#34;&#34;&#34;
+        Loads a CSV file and converts it to a pandas dataframe.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Loading {filename}&#34;)
+        data = pd.read_csv(filename, low_memory=False)
+        comments = data.pop(&#39;comments&#39;)
+        data.pop(&#39;datetime&#39;)
+        comments = comments[~comments.isna()].copy()
+        return data, comments
+    
+    def from_dataframe(self, data: pd.DataFrame, repace_data=True) -&gt; list[pd.DataFrame]:
+        &#34;&#34;&#34;
+        Create an Experiment object from a pandas DataFrame.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Generating from dataframe: {data}&#34;)
+        self.data = data
+        comments = data.pop(&#39;comments&#39;)
+        data.pop(&#39;datetime&#39;)
+        comments = comments[~comments.isna()].copy()
+        return data, comments
+
+    def extract_NE(self):
+        &#34;&#34;&#34;
+        Crawls through the comments to isolate NE-dose and generates its timeseries, appending &#39;NE dose&#39; it to self.data
+        &#34;&#34;&#34;
+        self.__log(&#34;Extracting NE&#34;)
+        tmp = self.comments.str.extract(r&#39;(?P&lt;event&gt;NE.+)(?P&lt;dose&gt;\d\.\d{2}|Off)&#39;)
+        tmp = tmp[~tmp.iloc[:,0].isna()]
+
+        tmp.iloc[-1,0] = &#39;NE Off&#39;
+        tmp.iloc[-1,-1] = 0
+        ne_dose = np.zeros((self.data.shape[0],))
+        for i in tmp.index.to_numpy():
+            ne_dose[i:] = tmp[&#39;dose&#39;][i]
+        self.data[&#39;NE dose&#39;] = ne_dose
+
+    def get_challenges(self):
+        &#34;&#34;&#34;
+        Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.
+        &#34;&#34;&#34;
+        self.__log(&#34;Extracting physiological challenges&#34;)
+        challenges=[]
+        tmp  = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
+        tmp = tmp[~tmp[&#39;challenge&#39;].isna()]
+        for challenge in tmp.challenge.unique():
+            print(challenge)
+            if len(tmp[tmp[&#39;challenge&#39;] == challenge].index):
+                start, end = tmp[tmp[&#39;challenge&#39;]==challenge].index
+            challenges.append([challenge, start, end, end-start+1])
+        challenges = pd.DataFrame(challenges, columns=[&#39;challenge&#39;, &#39;start&#39;, &#39;end&#39;, &#39;duration&#39;])
+        self.challenges = challenges
+        return self.challenges
+    
+    def challenges_to_events(self, pre=60, post=60):
+        events = {}
+        for i in range(len(self.challenges.challenge)):
+            tmp = self.challenges.iloc[i,:]
+            tmp_challenge = Event(self, tmp.start, tmp.end, pre=pre, post=post)
+            tmp_challenge.calc_features()
+            events[tmp.challenge] = tmp_challenge
+        self.events = events
+        return events
+        
+    def resample(self, fs_new):
+        &#34;&#34;&#34;
+        Resample data to the given sampling rate.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Resampling from {self.fs:0.2f} to {fs_new:0.2f} Hz&#34;)
+        nsamples = np.int16(self.data.shape[0] * fs_new // self.fs)
+        d_np = self.data.to_numpy()
+        d_r = signal.resample(d_np, nsamples, axis=0)
+        df_r = pd.DataFrame(d_r, columns=self.data.columns)
+        ts = np.arange(0, d_r.shape[0]/fs_new, 1/fs_new)
+        df_r[&#39;ts&#39;] = ts
+        self.data = df_r
+        self._comments = self.comments.copy()
+
+        _comments = self.comments.copy()
+        _comments.index = _comments.index.to_numpy() * fs_new // self.fs
+        self.comments = _comments
+        self.fs = fs_new
+        # self.extract_NE()
+
+    def get_fft(self, n=2048):
+        self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1/self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[1:])
+        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        self.fft = fft_df
+
+    def butter(self, order=2, wn=1/10, fs=1, btype=&#39;lowpass&#39;):
+        b, a = signal.butter(2, wn, fs=fs, btype=btype)
+        self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;:fs, &#39;btype&#39;:btype, &#39;b&#39;: b, &#39;a&#39;:a}
+        self.__log(f&#34;Generated Butterworth filter. Params:{self.filter_params}&#34;)
+
+    def filter(self):
+        if self.filter_params is None:
+            print(&#34;[ERROR] First call Experiment.butter() to generate a filter before filtering data.&#34;)
+            return
+
+        self.__log(f&#34;Filtering data with {self.filter_params[&#39;btype&#39;]} {self.filter_params[&#39;Wn&#39;]} Hz&#34;)
+
+        data = self.data.to_numpy()
+        ts = data[:,0]
+
+        if (self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;):
+            data = data - data.mean(axis=0)
+
+        b = self.filter_params[&#39;b&#39;]
+        a = self.filter_params[&#39;a&#39;]
+
+        filt_data = signal.filtfilt(b, a, data, axis=0)
+        filt_df = pd.DataFrame(filt_data, columns=self.data.columns)
+        filt_df[&#39;ts&#39;] = ts
+        self.data = filt_df
+        self.extract_NE()
+
+    def reset(self):
+        &#34;&#34;&#34;
+        Reset data to the original dataframe generated when the object was instantiated.
+        &#34;&#34;&#34;
+        self.__log(&#34;Reseting data to original values loaded from file.&#34;)
+        self.data = self._data.copy()
+        self.comments = self._comments.copy()
+        self.filter_params=None
+        self.fs = 100
+
+    def save(self, filename):
+        &#34;Save pickled object&#34;
+        self.__log(f&#34;Saving object as {filename}&#34;)
+        with open(filename, &#34;wb&#34;) as f:
+            pickle.dump(self, f)
+
+    def __repr__(self):
+        return f&#34;Dataset loaded from {self.filename} with {self.data.shape[0]} samples and fs={self.fs}&#34;
+
+class Event:
+    &#34;&#34;&#34;
+    A class for working with instances of physiological challenges such as hypoxias, map-manipulations, etc.
+    Has methods that enable the estimation of feautures such as the area under the curve, cumsums and sigmoid-fits.
+    &#34;&#34;&#34;
+    def __init__(self, dataset: Experiment = None, start=0, stop=-1, pre=0, post=0, detrend=False):
+        print(&#34;Instantiating Event object&#34;)
+        self.fs = dataset.fs
+        data = dataset.data.iloc[start-pre*self.fs:stop+post*self.fs,:].copy()
+        data = data - data.iloc[:pre, :].mean(axis=0)
+        self.init_params = {&#39;pre&#39;: pre, &#39;start&#39;:start, &#39;stop&#39;: stop, &#39;post&#39;: post, &#39;detrend&#39;: detrend, &#39;Experiment&#39;: dataset.__repr__()}
+        data[&#39;ts&#39;] = data[&#39;ts&#39;] - data[&#39;ts&#39;].iloc[pre]
+        data.set_index(&#39;ts&#39;, inplace=True, drop=False)
+        self.data = data
+        self.duration = (stop - start + 1)/self.fs
+        self.calc_features()
+        if detrend:
+            self.detrend()
+
+
+    def detrend(self):
+        _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type=&#39;linear&#39;)
+        self.data.iloc[:,1:] = _d.iloc[:,1:]
+
+
+    def get_fft(self, n=2048):
+        self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1/self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[2:])
+        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        self.fft = fft_df
+
+
+    def calc_features(self):
+        z_data = (self.data - self.data.iloc[:self.init_params[&#39;pre&#39;], :].mean(axis=0)).copy()
+        f_sum = z_data.sum(axis=0).copy()/self.fs
+        f_cumsum =z_data.cumsum(axis=0).copy()/self.fs
+        self.features = {&#39;data&#39;: z_data, &#39;sum&#39;: f_sum, &#39;cumsum&#39;: f_cumsum}
+        
+
+    def save(self, object_name):
+        with open(object_name, &#34;wb&#34;) as f:
+            pickle.dump(self, f)
+
+    def __repr__(self):
+        return &#34;Event object&#34;</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="pynirs.data_objects.Event"><code class="flex name class">
+<span>class <span class="ident">Event</span></span>
+<span>(</span><span>dataset: <a title="pynirs.data_objects.Experiment" href="#pynirs.data_objects.Experiment">Experiment</a> = None, start=0, stop=-1, pre=0, post=0, detrend=False)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A class for working with instances of physiological challenges such as hypoxias, map-manipulations, etc.
+Has methods that enable the estimation of feautures such as the area under the curve, cumsums and sigmoid-fits.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Event:
+    &#34;&#34;&#34;
+    A class for working with instances of physiological challenges such as hypoxias, map-manipulations, etc.
+    Has methods that enable the estimation of feautures such as the area under the curve, cumsums and sigmoid-fits.
+    &#34;&#34;&#34;
+    def __init__(self, dataset: Experiment = None, start=0, stop=-1, pre=0, post=0, detrend=False):
+        print(&#34;Instantiating Event object&#34;)
+        self.fs = dataset.fs
+        data = dataset.data.iloc[start-pre*self.fs:stop+post*self.fs,:].copy()
+        data = data - data.iloc[:pre, :].mean(axis=0)
+        self.init_params = {&#39;pre&#39;: pre, &#39;start&#39;:start, &#39;stop&#39;: stop, &#39;post&#39;: post, &#39;detrend&#39;: detrend, &#39;Experiment&#39;: dataset.__repr__()}
+        data[&#39;ts&#39;] = data[&#39;ts&#39;] - data[&#39;ts&#39;].iloc[pre]
+        data.set_index(&#39;ts&#39;, inplace=True, drop=False)
+        self.data = data
+        self.duration = (stop - start + 1)/self.fs
+        self.calc_features()
+        if detrend:
+            self.detrend()
+
+
+    def detrend(self):
+        _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type=&#39;linear&#39;)
+        self.data.iloc[:,1:] = _d.iloc[:,1:]
+
+
+    def get_fft(self, n=2048):
+        self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1/self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[2:])
+        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        self.fft = fft_df
+
+
+    def calc_features(self):
+        z_data = (self.data - self.data.iloc[:self.init_params[&#39;pre&#39;], :].mean(axis=0)).copy()
+        f_sum = z_data.sum(axis=0).copy()/self.fs
+        f_cumsum =z_data.cumsum(axis=0).copy()/self.fs
+        self.features = {&#39;data&#39;: z_data, &#39;sum&#39;: f_sum, &#39;cumsum&#39;: f_cumsum}
+        
+
+    def save(self, object_name):
+        with open(object_name, &#34;wb&#34;) as f:
+            pickle.dump(self, f)
+
+    def __repr__(self):
+        return &#34;Event object&#34;</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="pynirs.data_objects.Event.calc_features"><code class="name flex">
+<span>def <span class="ident">calc_features</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calc_features(self):
+    z_data = (self.data - self.data.iloc[:self.init_params[&#39;pre&#39;], :].mean(axis=0)).copy()
+    f_sum = z_data.sum(axis=0).copy()/self.fs
+    f_cumsum =z_data.cumsum(axis=0).copy()/self.fs
+    self.features = {&#39;data&#39;: z_data, &#39;sum&#39;: f_sum, &#39;cumsum&#39;: f_cumsum}</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Event.detrend"><code class="name flex">
+<span>def <span class="ident">detrend</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def detrend(self):
+    _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type=&#39;linear&#39;)
+    self.data.iloc[:,1:] = _d.iloc[:,1:]</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Event.get_fft"><code class="name flex">
+<span>def <span class="ident">get_fft</span></span>(<span>self, n=2048)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_fft(self, n=2048):
+    self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
+    fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
+    xf = fft.fftfreq(n, 1/self.fs)
+
+    fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[2:])
+    fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+    self.fft = fft_df</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Event.save"><code class="name flex">
+<span>def <span class="ident">save</span></span>(<span>self, object_name)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save(self, object_name):
+    with open(object_name, &#34;wb&#34;) as f:
+        pickle.dump(self, f)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="pynirs.data_objects.Experiment"><code class="flex name class">
+<span>class <span class="ident">Experiment</span></span>
+<span>(</span><span>source, auto_resample=True, extract_ne=True, fs=100)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A class for loading and manipulating timeseries data from a CSV file. Has methods to allow resampling, filtering, etc.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Experiment:
+    &#34;&#34;&#34;
+    A class for loading and manipulating timeseries data from a CSV file. Has methods to allow resampling, filtering, etc.
+    &#34;&#34;&#34;
+
+    def __init__(self, source, auto_resample=True, extract_ne=True, fs=100):
+        self._log = []
+        self.__log(&#34;Instantiating Experiment object&#34;)
+        self.fs = fs
+        self.filter_params = None
+        if isinstance(source, pd.DataFrame):
+            self.data, self.comments = self.from_dataframe(source)
+            self.filename = f&#34;{source}&#34;
+        else:
+            self.filename = source
+            self.data, self.comments = self.load_file(source)
+        self._data = self.data.copy()
+        if extract_ne:
+            self.extract_NE()
+        if auto_resample:
+            self.resample(1)
+
+    def __log(self, statement):
+        self._log.append(statement)
+        print(statement)
+
+    def get_log(self):
+        &#34;&#34;&#34;Returns the log of the experiment object&#34;&#34;&#34;
+        return self._log
+
+
+    def load_file(self, filename: str, repace_data=True) -&gt; list[pd.DataFrame]:
+        &#34;&#34;&#34;
+        Loads a CSV file and converts it to a pandas dataframe.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Loading {filename}&#34;)
+        data = pd.read_csv(filename, low_memory=False)
+        comments = data.pop(&#39;comments&#39;)
+        data.pop(&#39;datetime&#39;)
+        comments = comments[~comments.isna()].copy()
+        return data, comments
+    
+    def from_dataframe(self, data: pd.DataFrame, repace_data=True) -&gt; list[pd.DataFrame]:
+        &#34;&#34;&#34;
+        Create an Experiment object from a pandas DataFrame.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Generating from dataframe: {data}&#34;)
+        self.data = data
+        comments = data.pop(&#39;comments&#39;)
+        data.pop(&#39;datetime&#39;)
+        comments = comments[~comments.isna()].copy()
+        return data, comments
+
+    def extract_NE(self):
+        &#34;&#34;&#34;
+        Crawls through the comments to isolate NE-dose and generates its timeseries, appending &#39;NE dose&#39; it to self.data
+        &#34;&#34;&#34;
+        self.__log(&#34;Extracting NE&#34;)
+        tmp = self.comments.str.extract(r&#39;(?P&lt;event&gt;NE.+)(?P&lt;dose&gt;\d\.\d{2}|Off)&#39;)
+        tmp = tmp[~tmp.iloc[:,0].isna()]
+
+        tmp.iloc[-1,0] = &#39;NE Off&#39;
+        tmp.iloc[-1,-1] = 0
+        ne_dose = np.zeros((self.data.shape[0],))
+        for i in tmp.index.to_numpy():
+            ne_dose[i:] = tmp[&#39;dose&#39;][i]
+        self.data[&#39;NE dose&#39;] = ne_dose
+
+    def get_challenges(self):
+        &#34;&#34;&#34;
+        Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.
+        &#34;&#34;&#34;
+        self.__log(&#34;Extracting physiological challenges&#34;)
+        challenges=[]
+        tmp  = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
+        tmp = tmp[~tmp[&#39;challenge&#39;].isna()]
+        for challenge in tmp.challenge.unique():
+            print(challenge)
+            if len(tmp[tmp[&#39;challenge&#39;] == challenge].index):
+                start, end = tmp[tmp[&#39;challenge&#39;]==challenge].index
+            challenges.append([challenge, start, end, end-start+1])
+        challenges = pd.DataFrame(challenges, columns=[&#39;challenge&#39;, &#39;start&#39;, &#39;end&#39;, &#39;duration&#39;])
+        self.challenges = challenges
+        return self.challenges
+    
+    def challenges_to_events(self, pre=60, post=60):
+        events = {}
+        for i in range(len(self.challenges.challenge)):
+            tmp = self.challenges.iloc[i,:]
+            tmp_challenge = Event(self, tmp.start, tmp.end, pre=pre, post=post)
+            tmp_challenge.calc_features()
+            events[tmp.challenge] = tmp_challenge
+        self.events = events
+        return events
+        
+    def resample(self, fs_new):
+        &#34;&#34;&#34;
+        Resample data to the given sampling rate.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Resampling from {self.fs:0.2f} to {fs_new:0.2f} Hz&#34;)
+        nsamples = np.int16(self.data.shape[0] * fs_new // self.fs)
+        d_np = self.data.to_numpy()
+        d_r = signal.resample(d_np, nsamples, axis=0)
+        df_r = pd.DataFrame(d_r, columns=self.data.columns)
+        ts = np.arange(0, d_r.shape[0]/fs_new, 1/fs_new)
+        df_r[&#39;ts&#39;] = ts
+        self.data = df_r
+        self._comments = self.comments.copy()
+
+        _comments = self.comments.copy()
+        _comments.index = _comments.index.to_numpy() * fs_new // self.fs
+        self.comments = _comments
+        self.fs = fs_new
+        # self.extract_NE()
+
+    def get_fft(self, n=2048):
+        self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1/self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[1:])
+        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        self.fft = fft_df
+
+    def butter(self, order=2, wn=1/10, fs=1, btype=&#39;lowpass&#39;):
+        b, a = signal.butter(2, wn, fs=fs, btype=btype)
+        self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;:fs, &#39;btype&#39;:btype, &#39;b&#39;: b, &#39;a&#39;:a}
+        self.__log(f&#34;Generated Butterworth filter. Params:{self.filter_params}&#34;)
+
+    def filter(self):
+        if self.filter_params is None:
+            print(&#34;[ERROR] First call Experiment.butter() to generate a filter before filtering data.&#34;)
+            return
+
+        self.__log(f&#34;Filtering data with {self.filter_params[&#39;btype&#39;]} {self.filter_params[&#39;Wn&#39;]} Hz&#34;)
+
+        data = self.data.to_numpy()
+        ts = data[:,0]
+
+        if (self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;):
+            data = data - data.mean(axis=0)
+
+        b = self.filter_params[&#39;b&#39;]
+        a = self.filter_params[&#39;a&#39;]
+
+        filt_data = signal.filtfilt(b, a, data, axis=0)
+        filt_df = pd.DataFrame(filt_data, columns=self.data.columns)
+        filt_df[&#39;ts&#39;] = ts
+        self.data = filt_df
+        self.extract_NE()
+
+    def reset(self):
+        &#34;&#34;&#34;
+        Reset data to the original dataframe generated when the object was instantiated.
+        &#34;&#34;&#34;
+        self.__log(&#34;Reseting data to original values loaded from file.&#34;)
+        self.data = self._data.copy()
+        self.comments = self._comments.copy()
+        self.filter_params=None
+        self.fs = 100
+
+    def save(self, filename):
+        &#34;Save pickled object&#34;
+        self.__log(f&#34;Saving object as {filename}&#34;)
+        with open(filename, &#34;wb&#34;) as f:
+            pickle.dump(self, f)
+
+    def __repr__(self):
+        return f&#34;Dataset loaded from {self.filename} with {self.data.shape[0]} samples and fs={self.fs}&#34;</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="pynirs.data_objects.Experiment.butter"><code class="name flex">
+<span>def <span class="ident">butter</span></span>(<span>self, order=2, wn=0.1, fs=1, btype='lowpass')</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def butter(self, order=2, wn=1/10, fs=1, btype=&#39;lowpass&#39;):
+    b, a = signal.butter(2, wn, fs=fs, btype=btype)
+    self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;:fs, &#39;btype&#39;:btype, &#39;b&#39;: b, &#39;a&#39;:a}
+    self.__log(f&#34;Generated Butterworth filter. Params:{self.filter_params}&#34;)</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.challenges_to_events"><code class="name flex">
+<span>def <span class="ident">challenges_to_events</span></span>(<span>self, pre=60, post=60)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def challenges_to_events(self, pre=60, post=60):
+    events = {}
+    for i in range(len(self.challenges.challenge)):
+        tmp = self.challenges.iloc[i,:]
+        tmp_challenge = Event(self, tmp.start, tmp.end, pre=pre, post=post)
+        tmp_challenge.calc_features()
+        events[tmp.challenge] = tmp_challenge
+    self.events = events
+    return events</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.extract_NE"><code class="name flex">
+<span>def <span class="ident">extract_NE</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Crawls through the comments to isolate NE-dose and generates its timeseries, appending 'NE dose' it to self.data</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def extract_NE(self):
+    &#34;&#34;&#34;
+    Crawls through the comments to isolate NE-dose and generates its timeseries, appending &#39;NE dose&#39; it to self.data
+    &#34;&#34;&#34;
+    self.__log(&#34;Extracting NE&#34;)
+    tmp = self.comments.str.extract(r&#39;(?P&lt;event&gt;NE.+)(?P&lt;dose&gt;\d\.\d{2}|Off)&#39;)
+    tmp = tmp[~tmp.iloc[:,0].isna()]
+
+    tmp.iloc[-1,0] = &#39;NE Off&#39;
+    tmp.iloc[-1,-1] = 0
+    ne_dose = np.zeros((self.data.shape[0],))
+    for i in tmp.index.to_numpy():
+        ne_dose[i:] = tmp[&#39;dose&#39;][i]
+    self.data[&#39;NE dose&#39;] = ne_dose</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.filter"><code class="name flex">
+<span>def <span class="ident">filter</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def filter(self):
+    if self.filter_params is None:
+        print(&#34;[ERROR] First call Experiment.butter() to generate a filter before filtering data.&#34;)
+        return
+
+    self.__log(f&#34;Filtering data with {self.filter_params[&#39;btype&#39;]} {self.filter_params[&#39;Wn&#39;]} Hz&#34;)
+
+    data = self.data.to_numpy()
+    ts = data[:,0]
+
+    if (self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;):
+        data = data - data.mean(axis=0)
+
+    b = self.filter_params[&#39;b&#39;]
+    a = self.filter_params[&#39;a&#39;]
+
+    filt_data = signal.filtfilt(b, a, data, axis=0)
+    filt_df = pd.DataFrame(filt_data, columns=self.data.columns)
+    filt_df[&#39;ts&#39;] = ts
+    self.data = filt_df
+    self.extract_NE()</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.from_dataframe"><code class="name flex">
+<span>def <span class="ident">from_dataframe</span></span>(<span>self, data: pandas.core.frame.DataFrame, repace_data=True) ‑> list[pandas.core.frame.DataFrame]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create an Experiment object from a pandas DataFrame.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def from_dataframe(self, data: pd.DataFrame, repace_data=True) -&gt; list[pd.DataFrame]:
+    &#34;&#34;&#34;
+    Create an Experiment object from a pandas DataFrame.
+    &#34;&#34;&#34;
+    self.__log(f&#34;Generating from dataframe: {data}&#34;)
+    self.data = data
+    comments = data.pop(&#39;comments&#39;)
+    data.pop(&#39;datetime&#39;)
+    comments = comments[~comments.isna()].copy()
+    return data, comments</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.get_challenges"><code class="name flex">
+<span>def <span class="ident">get_challenges</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_challenges(self):
+    &#34;&#34;&#34;
+    Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.
+    &#34;&#34;&#34;
+    self.__log(&#34;Extracting physiological challenges&#34;)
+    challenges=[]
+    tmp  = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
+    tmp = tmp[~tmp[&#39;challenge&#39;].isna()]
+    for challenge in tmp.challenge.unique():
+        print(challenge)
+        if len(tmp[tmp[&#39;challenge&#39;] == challenge].index):
+            start, end = tmp[tmp[&#39;challenge&#39;]==challenge].index
+        challenges.append([challenge, start, end, end-start+1])
+    challenges = pd.DataFrame(challenges, columns=[&#39;challenge&#39;, &#39;start&#39;, &#39;end&#39;, &#39;duration&#39;])
+    self.challenges = challenges
+    return self.challenges</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.get_fft"><code class="name flex">
+<span>def <span class="ident">get_fft</span></span>(<span>self, n=2048)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_fft(self, n=2048):
+    self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
+    fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
+    xf = fft.fftfreq(n, 1/self.fs)
+
+    fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[1:])
+    fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+    self.fft = fft_df</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.get_log"><code class="name flex">
+<span>def <span class="ident">get_log</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Returns the log of the experiment object</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_log(self):
+    &#34;&#34;&#34;Returns the log of the experiment object&#34;&#34;&#34;
+    return self._log</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.load_file"><code class="name flex">
+<span>def <span class="ident">load_file</span></span>(<span>self, filename: str, repace_data=True) ‑> list[pandas.core.frame.DataFrame]</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Loads a CSV file and converts it to a pandas dataframe.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def load_file(self, filename: str, repace_data=True) -&gt; list[pd.DataFrame]:
+    &#34;&#34;&#34;
+    Loads a CSV file and converts it to a pandas dataframe.
+    &#34;&#34;&#34;
+    self.__log(f&#34;Loading {filename}&#34;)
+    data = pd.read_csv(filename, low_memory=False)
+    comments = data.pop(&#39;comments&#39;)
+    data.pop(&#39;datetime&#39;)
+    comments = comments[~comments.isna()].copy()
+    return data, comments</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.resample"><code class="name flex">
+<span>def <span class="ident">resample</span></span>(<span>self, fs_new)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Resample data to the given sampling rate.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def resample(self, fs_new):
+    &#34;&#34;&#34;
+    Resample data to the given sampling rate.
+    &#34;&#34;&#34;
+    self.__log(f&#34;Resampling from {self.fs:0.2f} to {fs_new:0.2f} Hz&#34;)
+    nsamples = np.int16(self.data.shape[0] * fs_new // self.fs)
+    d_np = self.data.to_numpy()
+    d_r = signal.resample(d_np, nsamples, axis=0)
+    df_r = pd.DataFrame(d_r, columns=self.data.columns)
+    ts = np.arange(0, d_r.shape[0]/fs_new, 1/fs_new)
+    df_r[&#39;ts&#39;] = ts
+    self.data = df_r
+    self._comments = self.comments.copy()
+
+    _comments = self.comments.copy()
+    _comments.index = _comments.index.to_numpy() * fs_new // self.fs
+    self.comments = _comments
+    self.fs = fs_new
+    # self.extract_NE()</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.reset"><code class="name flex">
+<span>def <span class="ident">reset</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Reset data to the original dataframe generated when the object was instantiated.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def reset(self):
+    &#34;&#34;&#34;
+    Reset data to the original dataframe generated when the object was instantiated.
+    &#34;&#34;&#34;
+    self.__log(&#34;Reseting data to original values loaded from file.&#34;)
+    self.data = self._data.copy()
+    self.comments = self._comments.copy()
+    self.filter_params=None
+    self.fs = 100</code></pre>
+</details>
+</dd>
+<dt id="pynirs.data_objects.Experiment.save"><code class="name flex">
+<span>def <span class="ident">save</span></span>(<span>self, filename)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Save pickled object</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save(self, filename):
+    &#34;Save pickled object&#34;
+    self.__log(f&#34;Saving object as {filename}&#34;)
+    with open(filename, &#34;wb&#34;) as f:
+        pickle.dump(self, f)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="pynirs" href="index.html">pynirs</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="pynirs.data_objects.Event" href="#pynirs.data_objects.Event">Event</a></code></h4>
+<ul class="">
+<li><code><a title="pynirs.data_objects.Event.calc_features" href="#pynirs.data_objects.Event.calc_features">calc_features</a></code></li>
+<li><code><a title="pynirs.data_objects.Event.detrend" href="#pynirs.data_objects.Event.detrend">detrend</a></code></li>
+<li><code><a title="pynirs.data_objects.Event.get_fft" href="#pynirs.data_objects.Event.get_fft">get_fft</a></code></li>
+<li><code><a title="pynirs.data_objects.Event.save" href="#pynirs.data_objects.Event.save">save</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="pynirs.data_objects.Experiment" href="#pynirs.data_objects.Experiment">Experiment</a></code></h4>
+<ul class="">
+<li><code><a title="pynirs.data_objects.Experiment.butter" href="#pynirs.data_objects.Experiment.butter">butter</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.challenges_to_events" href="#pynirs.data_objects.Experiment.challenges_to_events">challenges_to_events</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.extract_NE" href="#pynirs.data_objects.Experiment.extract_NE">extract_NE</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.filter" href="#pynirs.data_objects.Experiment.filter">filter</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.from_dataframe" href="#pynirs.data_objects.Experiment.from_dataframe">from_dataframe</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.get_challenges" href="#pynirs.data_objects.Experiment.get_challenges">get_challenges</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.get_fft" href="#pynirs.data_objects.Experiment.get_fft">get_fft</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.get_log" href="#pynirs.data_objects.Experiment.get_log">get_log</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.load_file" href="#pynirs.data_objects.Experiment.load_file">load_file</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.resample" href="#pynirs.data_objects.Experiment.resample">resample</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.reset" href="#pynirs.data_objects.Experiment.reset">reset</a></code></li>
+<li><code><a title="pynirs.data_objects.Experiment.save" href="#pynirs.data_objects.Experiment.save">save</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.2</a>.</p>
+</footer>
+</body>
+</html>

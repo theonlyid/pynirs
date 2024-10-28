@@ -1,0 +1,9 @@
+*.ipynb_checkpoints/
+build/
+pynirs.egg-info/
+*.e*
+src/pynirs/__pycache__/
+*.pkl
+*test*.ipynb
+__pycache__/*
+matlab.bat
