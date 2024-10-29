@@ -433,21 +433,17 @@ if __name__ == "__main__":
     import numpy as np
     import matplotlib.pyplot as plt
 
-    with open('src/pynirs/data/combined_data.pkl', 'rb') as f:
-        data = pickle.load(f)
+    pd_reads = pd.read_csv('./src/pynirs/data/test_data.csv').to_numpy().T
     
-    cols = [f"c NIRS 1.channel[{i}].1" for i in range(12)]
-    pd_reads = data[cols].to_numpy().T
-
     hb = HbConv(pd_reads)
     plt.subplots(3,1, sharex=True, sharey=True)
     plt.subplot(311)
     plt.plot(hb.observed["toi"])
     plt.title("TOI Observed")
-    plt.subplot(312)
+    plt.subplot(313)
     plt.plot(hb.cleaned["toi_ods"])
     plt.title("TOI (OD-grad cleaned)")
-    plt.subplot(313)
+    plt.subplot(312)
     plt.plot(hb.cleaned["toi_abs"])
     plt.title("TOI (Absorbance cleaned)")
     plt.show()

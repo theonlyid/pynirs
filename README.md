@@ -17,7 +17,7 @@ First you must close the package to a local folder. Use the command prompt to na
 Copy the package contents to a local folder. From the package root directory, run the following commands:
 
 ```
-$ git clone file://"path-to-repo"
+$ git clone https://github.com/theonlyid/pynirs.git
 ```
 
 where path-to-repo is the path to the remote folder on One-Drive.
@@ -40,7 +40,6 @@ To load and use the package in python, first activate the virtual environment,an
 ```bash
 $ conda activate pynirs
 $ python
-
 ```
 
 From Python you can load the library and seek help:
@@ -99,17 +98,6 @@ Finally, Matlab's own python interpreter needs to be configured.
 
 1. Close all current instances of Matlab, and launch a new instance by double clicking "Matlab.bat" in the root folder.
 
-2. In the Matlab prompt paste the command you copied and press return. Type ```pyversion``` and press return. It should show something like:
-
-   ```java
-   >> pyversion
-
-         version: '3.11.9'
-      executable: 'C:\Users\Continuum\anaconda3\python.exe'
-         library: 'C:\Users\Continuum\anaconda3\python37.dll'
-            home: 'C:\Users\Continuum\anaconda3'
-         isloaded: 0
-   ```
-
+2. In the Matlab prompt paste the command you copied and press return. Type ```pyversion``` and press return. It should show you the correct python.exe loaded from the environment where pynirs was installed.
 
 For an example on using the library with MATLAB, see the 'example_hbc_clean.m' located in docs/notebooks/matlab. 
