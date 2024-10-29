@@ -23,7 +23,6 @@
 </header>
 <section id="section-intro">
 <p>Module housing methods for calculating hb-concentration changes and toi from raw NIRS data.</p>
-<p>This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.</p>
 <p>Author: Ali Zaidi</p>
 <p>Date: 05-OCT-2024</p>
 <details class="source">
@@ -34,9 +33,6 @@
 Module housing methods for calculating hb-concentration changes and toi from raw NIRS data.
 
 
-This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.
-
-
 Author: Ali Zaidi
 
 Date: 05-OCT-2024
@@ -44,30 +40,70 @@ Date: 05-OCT-2024
 
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import FastICA
 
 class HbConv:
+    &#34;&#34;&#34;
+    Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.
+
+    This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.
+    The HbConv object takes in a data array with raw absorbances (shape: 12-channels x n-observations) and perfoms ambeint correction,
+    and calculates hb-concentration changes and TOI, along with an SVD based cleaning of the data.
+    For Hb-concentration changes the SVD is applied to the near and far channel data.
+    For TOI, the SVD is applied to both the ambient corrected absorbance data, or the optical density gradients. 
+
+
+    Attributes
+    ----------
+
+        observed: dict
+            A dictionary of data with the raw and converted data as was recorded. 
+            
+            raw_abs: np.ndarray (shape=(12, nobs))
+                The raw absorbance data
+
+            hbc_near: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the near channel.
+
+            hbc_far: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the far channel.
+            
+            toi: np.ndarray
+                The TOI calculated from the raw absorbance data (after ambient subtraction).
+
+        cleaned: dict
+            A dictionary of data with the raw and converted data after SVD cleaning.
+            
+            raw_abs: np.ndarray (shape=(10, nobs))
+                The cleaned absorbance data (without the ambinet channels)
+
+            hbc_near: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the near channel.
+
+            hbc_far: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the far channel.
+            
+            toi_abs: np.ndarray (shape=(nobs,))
+                The TOI calculated from the svd-cleaned near and far absorbance data.
+
+            toi_ods: np.ndarray (shape=(nobs,))
+                The TOI calculated from the svd-cleand OD-grads.
+    &#34;&#34;&#34;
+    
     def __init__(self, data: np.ndarray = None, svd_clean: bool = True):
         &#34;&#34;&#34;
-        Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.
+        Instantiate Object with absorbance data and obtain hb-concentration and toi values for both observed and clean data.
 
-        Parameters
-        ----------
-            data: np.ndarray
-                The raw data as a 12-channel matrix with each channel as a column vector
-            svd_clean: bool
-                Whether or not to apply the SVD cleaning on the data
-
-        Attributes
-        ----------
-            observed: dict
-                A dictionary of data with the raw and converted data as was recorded. 
-                
-                raw_data: np.ndarray (shape=(12,nobs))
-                    The raw absorbance data
-
-                hb_concs: np.ndarray
-                The predicted values based on the x-data, slope and intercept
+        Arguments
+        ---------
+            data: np.ndarray (12 x nobs)
+                The raw data as a 12-channel matrix with each channel as a row vector. 
+            svd_clean: bool (default=True)
+                Whether or not to apply the SVD cleaning on the data.
+        
+        Returns
+        -------
+            Hbconv: Object
+                An instance of the class object.
         
         &#34;&#34;&#34;
        
@@ -161,12 +197,54 @@ class HbConv:
 
     
     def subtract_ambient(self, pd_reads: np.ndarray) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Subtracts ambient data from the raw absorbance data.
+
+        Agruments
+        ---------
+            data: np.ndarray
+                The raw data as a 12-channel matrix with each channel as a column vector
+            svd_clean: bool
+                Whether or not to apply the SVD cleaning on the data
+
+        Returns
+        -------
+            observed: dict
+                A dictionary of data with the raw and converted data as was recorded. 
+                
+                raw_data: np.ndarray (shape=(12,nobs))
+                    The raw absorbance data
+
+                hb_concs: np.ndarray
+                    The predicted values based on the x-data, slope and intercept
+                
+                toi: np.ndarray
+                    The TOI calculated from the raw absorbance data (after ambient subtraction)
+        &#34;&#34;&#34;
         near_vals = pd_reads[:5, :] - pd_reads[5, :]
         far_vals = pd_reads[6:11, :] - pd_reads[11, :]
         return near_vals, far_vals
 
 
     def calc_hb_concs(self, near_pd_reads: np.ndarray, far_pd_reads:np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+        &#34;&#34;&#34;
+        Convert raw PD reads to near and far Hb-concentration changes.
+
+        Arguments
+        ---------
+            near_pd_reads: np.ndarray (5 x nobs)
+                The raw data as a 12-channel matrix with each channel as a column vector
+            far_pd_reads: np.ndarray (5 x nobs)
+                Whether or not to apply the SVD cleaning on the data
+
+        Returns
+        -------
+            conc_near: np.ndarray (2 x nobs)
+                Array of near Hb-concentration changes with rows being O2Hb and HHb respectively. 
+                
+            conc_far: np.ndarray (2 x nobs)
+                Array of far Hb-concentration changes with rows being O2Hb and HHb respectively. 
+        &#34;&#34;&#34;
 
         A_near_inv = self.__params[&#34;A_near_inv&#34;]
         A_far_inv = self.__params[&#34;A_far_inv&#34;]
@@ -182,6 +260,23 @@ class HbConv:
         return concs_near, concs_far
     
     def calc_gradients(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Calculate OD-gradients from ambient corrected near and far absorbance data
+
+        Arguments
+        ---------
+            near_pd_reads: np.ndarray (5 x nobs)
+                The raw data as a 12-channel matrix with each channel as a column vector
+            far_pd_reads: np.ndarray (5 x nobs)
+                Whether or not to apply the SVD cleaning on the data
+
+        Returns
+        -------
+            od_grads: np.ndarray (5 x nobs)
+                Array of log transformed, calibration corrected OD-gradients. 
+                
+        &#34;&#34;&#34;
+
         d = self.__params[&#34;sd_distance&#34;]
         abs_off = self.__params[&#34;abs_offsets&#34;]
         OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
@@ -191,16 +286,24 @@ class HbConv:
 
     def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray, svd_clean=False) -&gt; np.ndarray:
         &#34;&#34;&#34;
-        Calculates TOI using coefficients similar to the PLM.
+        Calculate TOI fron near and far absorbance data
 
-        Function inputs:
-        1. Ambient subtracted near PD reads
-        2. Ambient subtracted far PD reads
+        Arguments
+        ---------
+            near_pd_reads: np.ndarray (shape=(5, nobs))
+                The near channel absorbance data
+            far_pd_reads: np.ndarray (shape=(5, nobs))
+                The far channel absorbance data
+            svd_clean: bool (default=True)
+                Whether to apply SVD cleaning to the absorbance data. If True, the SVD is applied simultaneously
+                on the near and far data by stacking them vertically.
 
-        Function outputs:
-            toi
+        Returns
+        -------
+            toi: np.ndarray (shape 5 x nobs)
+                Array of log transformed, calibration corrected OD-gradients. 
+             
         &#34;&#34;&#34;
-
         OD_grads = self.calc_gradients(near_pd_reads, far_pd_reads)
         
         if svd_clean:
@@ -225,7 +328,17 @@ class HbConv:
 
     def get_pd_reads(df) -&gt; np.ndarray:
         &#34;&#34;&#34;
-        Get PD reads from Neurokey dataframe returned by NKY-utils.
+        Get PD reads from Neurokey dataframe returned by NKY-utils (for online use).
+        
+        Arguments
+        ---------
+            df: pd.DataFrame
+                A dataframe with the NKY-derived absorbance values
+        
+        Returns
+        -------
+            data: np.ndarray (shape=(12, nobs))
+                A numpy array with the absorbance data extraced from the dataframe
         &#34;&#34;&#34;
         d = np.empty((len(df), 12))
         d[:, :5] = df.iloc[:, 1:6].to_numpy()
@@ -265,12 +378,31 @@ class HbConv:
         return np.linalg.svd(data, full_matrices=full_matrices)
     
 
-    def ica(data):
-        &#34;Perform an Independent Component Analysis based decomposition on raw NIRS&#34;
-        return &#34;Not Implemented&#34;
+    def svd_clean(self, data, print_uvar=True, return_noise=True) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Clean absorbance data with SVD and return cleaned data (and noise, if return_noise is True).
 
-    def svd_clean(self, data, return_noise=True):
-        &#34;Clean raw NIRS 5WL data with SVD, return cleaned raw data&#34;
+        Arguments
+        ---------
+            data: np.ndarray (shape=(nchannels, nobs))
+                The data to be decomposed with the SVD.
+            
+            print_uvar: bool (default=True)
+                If True (default), will print the stdev of each column of U enabling quick assessment of cleaning. 
+                If the first value is less than 0.1, cleaning is good.
+            
+            return_noise: bool (default=True)
+                Whether or not to return the extracted component along with the cleaned data.
+        
+        Returns
+        -------
+            clean_data: np.ndarray (shape=(nchannels, nobs))
+                The cleaned data with the dominant component removed.
+
+            noise: np.ndarray (shape=(nobs,))
+                If return_noise is True, will also return the component removed during cleaning
+        
+        &#34;&#34;&#34;
 
         if data.shape[0] &lt; data.shape[1]:
             data = data.T
@@ -280,6 +412,7 @@ class HbConv:
         raw_data_mc = raw_data - raw_data_means
 
         u,s,v = np.linalg.svd(raw_data_mc.T, full_matrices=False)
+        if print_uvar: print(np.std(u, axis=0))
         
         noise = np.mean(u[:,0])*v[0,:]
         rec = u[:,1:-1] @ np.diag(s[1:-1]) @ v[1:-1,:]
@@ -292,8 +425,27 @@ class HbConv:
             return clean_data
         
 
-    def clean_hbc_toi(self, data): #TODO: Take 5WL data and return cleaned data
-        &#34;Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI&#34;
+    def clean_hbc_toi(self, data):
+        &#34;&#34;&#34;
+        Ambient subtract, clean and convert raw absorbance data.
+
+        Arguments
+        ---------
+            data: np.ndarray (shape=(12, nobs))
+                The raw data as a 12-channel matrix with each channel as a row vector. 
+        
+        Returns
+        -------
+            near_hb_clean: np.ndarray (shape=(2, nobs))
+                The SVD-cleaned near hb-concentration changes.
+            
+            far_hb_clean: np.ndarray (shape=(2, nobs))
+                The SVD-cleaned far hb-concentration changes.
+            
+            toi_clean: np.ndarray (shape=(nobs,))
+                The TOI calculated from the SVD-cleaned near and far absorbances.
+        
+        &#34;&#34;&#34;
 
         near, far = self.subtract_ambient(data)
         near_clean, _ = self.svd_clean(near)
@@ -312,18 +464,19 @@ if __name__ == &#34;__main__&#34;:
     import numpy as np
     import matplotlib.pyplot as plt
 
-    with open(&#39;src/pynirs/combined_data.pkl&#39;, &#39;rb&#39;) as f:
-        data = pickle.load(f)
+    pd_reads = pd.read_csv(&#39;./src/pynirs/data/test_data.csv&#39;).to_numpy().T
     
-    cols = [f&#34;c NIRS 1.channel[{i}].1&#34; for i in range(12)]
-    pd_reads = data[cols].to_numpy().T
-
     hb = HbConv(pd_reads)
-    plt.subplots(2,1, sharex=True, sharey=True)
-    plt.subplot(211)
+    plt.subplots(3,1, sharex=True, sharey=True)
+    plt.subplot(311)
     plt.plot(hb.observed[&#34;toi&#34;])
-    plt.subplot(212)
-    plt.plot(hb.cleaned[&#34;toi&#34;])
+    plt.title(&#34;TOI Observed&#34;)
+    plt.subplot(313)
+    plt.plot(hb.cleaned[&#34;toi_ods&#34;])
+    plt.title(&#34;TOI (OD-grad cleaned)&#34;)
+    plt.subplot(312)
+    plt.plot(hb.cleaned[&#34;toi_abs&#34;])
+    plt.title(&#34;TOI (Absorbance cleaned)&#34;)
     plt.show()
     print(&#34;done&#34;)</code></pre>
 </details>
@@ -343,48 +496,123 @@ if __name__ == &#34;__main__&#34;:
 </code></dt>
 <dd>
 <div class="desc"><p>Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.</p>
-<h2 id="parameters">Parameters</h2>
-<pre><code>data: np.ndarray
-    The raw data as a 12-channel matrix with each channel as a column vector
-svd_clean: bool
-    Whether or not to apply the SVD cleaning on the data
-</code></pre>
+<p>This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.
+The HbConv object takes in a data array with raw absorbances (shape: 12-channels x n-observations) and perfoms ambeint correction,
+and calculates hb-concentration changes and TOI, along with an SVD based cleaning of the data.
+For Hb-concentration changes the SVD is applied to the near and far channel data.
+For TOI, the SVD is applied to both the ambient corrected absorbance data, or the optical density gradients. </p>
 <h2 id="attributes">Attributes</h2>
 <pre><code>observed: dict
     A dictionary of data with the raw and converted data as was recorded.
 
-    raw_data: np.ndarray (shape=(12,nobs))
+    raw_abs: np.ndarray (shape=(12, nobs))
         The raw absorbance data
 
-    hb_concs: np.ndarray
-    The predicted values based on the x-data, slope and intercept
+    hbc_near: np.ndarray (shape=(2, nobs)
+        The converted hb-concentration changes for the near channel.
+
+    hbc_far: np.ndarray (shape=(2, nobs)
+        The converted hb-concentration changes for the far channel.
+
+    toi: np.ndarray
+        The TOI calculated from the raw absorbance data (after ambient subtraction).
+
+cleaned: dict
+    A dictionary of data with the raw and converted data after SVD cleaning.
+
+    raw_abs: np.ndarray (shape=(10, nobs))
+        The cleaned absorbance data (without the ambinet channels)
+
+    hbc_near: np.ndarray (shape=(2, nobs)
+        The converted hb-concentration changes for the near channel.
+
+    hbc_far: np.ndarray (shape=(2, nobs)
+        The converted hb-concentration changes for the far channel.
+
+    toi_abs: np.ndarray (shape=(nobs,))
+        The TOI calculated from the svd-cleaned near and far absorbance data.
+
+    toi_ods: np.ndarray (shape=(nobs,))
+        The TOI calculated from the svd-cleand OD-grads.
+</code></pre>
+<p>Instantiate Object with absorbance data and obtain hb-concentration and toi values for both observed and clean data.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>data: np.ndarray (12 x nobs)
+    The raw data as a 12-channel matrix with each channel as a row vector. 
+svd_clean: bool (default=True)
+    Whether or not to apply the SVD cleaning on the data.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>Hbconv: Object
+    An instance of the class object.
 </code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class HbConv:
+    &#34;&#34;&#34;
+    Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.
+
+    This module contains functions and wrappers for applying various transformations for data decomposition and cleaning.
+    The HbConv object takes in a data array with raw absorbances (shape: 12-channels x n-observations) and perfoms ambeint correction,
+    and calculates hb-concentration changes and TOI, along with an SVD based cleaning of the data.
+    For Hb-concentration changes the SVD is applied to the near and far channel data.
+    For TOI, the SVD is applied to both the ambient corrected absorbance data, or the optical density gradients. 
+
+
+    Attributes
+    ----------
+
+        observed: dict
+            A dictionary of data with the raw and converted data as was recorded. 
+            
+            raw_abs: np.ndarray (shape=(12, nobs))
+                The raw absorbance data
+
+            hbc_near: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the near channel.
+
+            hbc_far: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the far channel.
+            
+            toi: np.ndarray
+                The TOI calculated from the raw absorbance data (after ambient subtraction).
+
+        cleaned: dict
+            A dictionary of data with the raw and converted data after SVD cleaning.
+            
+            raw_abs: np.ndarray (shape=(10, nobs))
+                The cleaned absorbance data (without the ambinet channels)
+
+            hbc_near: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the near channel.
+
+            hbc_far: np.ndarray (shape=(2, nobs)
+                The converted hb-concentration changes for the far channel.
+            
+            toi_abs: np.ndarray (shape=(nobs,))
+                The TOI calculated from the svd-cleaned near and far absorbance data.
+
+            toi_ods: np.ndarray (shape=(nobs,))
+                The TOI calculated from the svd-cleand OD-grads.
+    &#34;&#34;&#34;
+    
     def __init__(self, data: np.ndarray = None, svd_clean: bool = True):
         &#34;&#34;&#34;
-        Class that handles conversion of raw PD reads to converted (and cleaned) Hb-concentration changes and TOI.
+        Instantiate Object with absorbance data and obtain hb-concentration and toi values for both observed and clean data.
 
-        Parameters
-        ----------
-            data: np.ndarray
-                The raw data as a 12-channel matrix with each channel as a column vector
-            svd_clean: bool
-                Whether or not to apply the SVD cleaning on the data
-
-        Attributes
-        ----------
-            observed: dict
-                A dictionary of data with the raw and converted data as was recorded. 
-                
-                raw_data: np.ndarray (shape=(12,nobs))
-                    The raw absorbance data
-
-                hb_concs: np.ndarray
-                The predicted values based on the x-data, slope and intercept
+        Arguments
+        ---------
+            data: np.ndarray (12 x nobs)
+                The raw data as a 12-channel matrix with each channel as a row vector. 
+            svd_clean: bool (default=True)
+                Whether or not to apply the SVD cleaning on the data.
+        
+        Returns
+        -------
+            Hbconv: Object
+                An instance of the class object.
         
         &#34;&#34;&#34;
        
@@ -478,12 +706,54 @@ svd_clean: bool
 
     
     def subtract_ambient(self, pd_reads: np.ndarray) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Subtracts ambient data from the raw absorbance data.
+
+        Agruments
+        ---------
+            data: np.ndarray
+                The raw data as a 12-channel matrix with each channel as a column vector
+            svd_clean: bool
+                Whether or not to apply the SVD cleaning on the data
+
+        Returns
+        -------
+            observed: dict
+                A dictionary of data with the raw and converted data as was recorded. 
+                
+                raw_data: np.ndarray (shape=(12,nobs))
+                    The raw absorbance data
+
+                hb_concs: np.ndarray
+                    The predicted values based on the x-data, slope and intercept
+                
+                toi: np.ndarray
+                    The TOI calculated from the raw absorbance data (after ambient subtraction)
+        &#34;&#34;&#34;
         near_vals = pd_reads[:5, :] - pd_reads[5, :]
         far_vals = pd_reads[6:11, :] - pd_reads[11, :]
         return near_vals, far_vals
 
 
     def calc_hb_concs(self, near_pd_reads: np.ndarray, far_pd_reads:np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+        &#34;&#34;&#34;
+        Convert raw PD reads to near and far Hb-concentration changes.
+
+        Arguments
+        ---------
+            near_pd_reads: np.ndarray (5 x nobs)
+                The raw data as a 12-channel matrix with each channel as a column vector
+            far_pd_reads: np.ndarray (5 x nobs)
+                Whether or not to apply the SVD cleaning on the data
+
+        Returns
+        -------
+            conc_near: np.ndarray (2 x nobs)
+                Array of near Hb-concentration changes with rows being O2Hb and HHb respectively. 
+                
+            conc_far: np.ndarray (2 x nobs)
+                Array of far Hb-concentration changes with rows being O2Hb and HHb respectively. 
+        &#34;&#34;&#34;
 
         A_near_inv = self.__params[&#34;A_near_inv&#34;]
         A_far_inv = self.__params[&#34;A_far_inv&#34;]
@@ -499,6 +769,23 @@ svd_clean: bool
         return concs_near, concs_far
     
     def calc_gradients(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Calculate OD-gradients from ambient corrected near and far absorbance data
+
+        Arguments
+        ---------
+            near_pd_reads: np.ndarray (5 x nobs)
+                The raw data as a 12-channel matrix with each channel as a column vector
+            far_pd_reads: np.ndarray (5 x nobs)
+                Whether or not to apply the SVD cleaning on the data
+
+        Returns
+        -------
+            od_grads: np.ndarray (5 x nobs)
+                Array of log transformed, calibration corrected OD-gradients. 
+                
+        &#34;&#34;&#34;
+
         d = self.__params[&#34;sd_distance&#34;]
         abs_off = self.__params[&#34;abs_offsets&#34;]
         OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
@@ -508,16 +795,24 @@ svd_clean: bool
 
     def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray, svd_clean=False) -&gt; np.ndarray:
         &#34;&#34;&#34;
-        Calculates TOI using coefficients similar to the PLM.
+        Calculate TOI fron near and far absorbance data
 
-        Function inputs:
-        1. Ambient subtracted near PD reads
-        2. Ambient subtracted far PD reads
+        Arguments
+        ---------
+            near_pd_reads: np.ndarray (shape=(5, nobs))
+                The near channel absorbance data
+            far_pd_reads: np.ndarray (shape=(5, nobs))
+                The far channel absorbance data
+            svd_clean: bool (default=True)
+                Whether to apply SVD cleaning to the absorbance data. If True, the SVD is applied simultaneously
+                on the near and far data by stacking them vertically.
 
-        Function outputs:
-            toi
+        Returns
+        -------
+            toi: np.ndarray (shape 5 x nobs)
+                Array of log transformed, calibration corrected OD-gradients. 
+             
         &#34;&#34;&#34;
-
         OD_grads = self.calc_gradients(near_pd_reads, far_pd_reads)
         
         if svd_clean:
@@ -542,7 +837,17 @@ svd_clean: bool
 
     def get_pd_reads(df) -&gt; np.ndarray:
         &#34;&#34;&#34;
-        Get PD reads from Neurokey dataframe returned by NKY-utils.
+        Get PD reads from Neurokey dataframe returned by NKY-utils (for online use).
+        
+        Arguments
+        ---------
+            df: pd.DataFrame
+                A dataframe with the NKY-derived absorbance values
+        
+        Returns
+        -------
+            data: np.ndarray (shape=(12, nobs))
+                A numpy array with the absorbance data extraced from the dataframe
         &#34;&#34;&#34;
         d = np.empty((len(df), 12))
         d[:, :5] = df.iloc[:, 1:6].to_numpy()
@@ -582,12 +887,31 @@ svd_clean: bool
         return np.linalg.svd(data, full_matrices=full_matrices)
     
 
-    def ica(data):
-        &#34;Perform an Independent Component Analysis based decomposition on raw NIRS&#34;
-        return &#34;Not Implemented&#34;
+    def svd_clean(self, data, print_uvar=True, return_noise=True) -&gt; np.ndarray:
+        &#34;&#34;&#34;
+        Clean absorbance data with SVD and return cleaned data (and noise, if return_noise is True).
 
-    def svd_clean(self, data, return_noise=True):
-        &#34;Clean raw NIRS 5WL data with SVD, return cleaned raw data&#34;
+        Arguments
+        ---------
+            data: np.ndarray (shape=(nchannels, nobs))
+                The data to be decomposed with the SVD.
+            
+            print_uvar: bool (default=True)
+                If True (default), will print the stdev of each column of U enabling quick assessment of cleaning. 
+                If the first value is less than 0.1, cleaning is good.
+            
+            return_noise: bool (default=True)
+                Whether or not to return the extracted component along with the cleaned data.
+        
+        Returns
+        -------
+            clean_data: np.ndarray (shape=(nchannels, nobs))
+                The cleaned data with the dominant component removed.
+
+            noise: np.ndarray (shape=(nobs,))
+                If return_noise is True, will also return the component removed during cleaning
+        
+        &#34;&#34;&#34;
 
         if data.shape[0] &lt; data.shape[1]:
             data = data.T
@@ -597,6 +921,7 @@ svd_clean: bool
         raw_data_mc = raw_data - raw_data_means
 
         u,s,v = np.linalg.svd(raw_data_mc.T, full_matrices=False)
+        if print_uvar: print(np.std(u, axis=0))
         
         noise = np.mean(u[:,0])*v[0,:]
         rec = u[:,1:-1] @ np.diag(s[1:-1]) @ v[1:-1,:]
@@ -609,8 +934,27 @@ svd_clean: bool
             return clean_data
         
 
-    def clean_hbc_toi(self, data): #TODO: Take 5WL data and return cleaned data
-        &#34;Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI&#34;
+    def clean_hbc_toi(self, data):
+        &#34;&#34;&#34;
+        Ambient subtract, clean and convert raw absorbance data.
+
+        Arguments
+        ---------
+            data: np.ndarray (shape=(12, nobs))
+                The raw data as a 12-channel matrix with each channel as a row vector. 
+        
+        Returns
+        -------
+            near_hb_clean: np.ndarray (shape=(2, nobs))
+                The SVD-cleaned near hb-concentration changes.
+            
+            far_hb_clean: np.ndarray (shape=(2, nobs))
+                The SVD-cleaned far hb-concentration changes.
+            
+            toi_clean: np.ndarray (shape=(nobs,))
+                The TOI calculated from the SVD-cleaned near and far absorbances.
+        
+        &#34;&#34;&#34;
 
         near, far = self.subtract_ambient(data)
         near_clean, _ = self.svd_clean(near)
@@ -627,12 +971,39 @@ svd_clean: bool
 <span>def <span class="ident">calc_gradients</span></span>(<span>self, near_pd_reads: numpy.ndarray, far_pd_reads: numpy.ndarray) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Calculate OD-gradients from ambient corrected near and far absorbance data</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>near_pd_reads: np.ndarray (5 x nobs)
+    The raw data as a 12-channel matrix with each channel as a column vector
+far_pd_reads: np.ndarray (5 x nobs)
+    Whether or not to apply the SVD cleaning on the data
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>od_grads: np.ndarray (5 x nobs)
+    Array of log transformed, calibration corrected OD-gradients.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def calc_gradients(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray) -&gt; np.ndarray:
+    &#34;&#34;&#34;
+    Calculate OD-gradients from ambient corrected near and far absorbance data
+
+    Arguments
+    ---------
+        near_pd_reads: np.ndarray (5 x nobs)
+            The raw data as a 12-channel matrix with each channel as a column vector
+        far_pd_reads: np.ndarray (5 x nobs)
+            Whether or not to apply the SVD cleaning on the data
+
+    Returns
+    -------
+        od_grads: np.ndarray (5 x nobs)
+            Array of log transformed, calibration corrected OD-gradients. 
+            
+    &#34;&#34;&#34;
+
     d = self.__params[&#34;sd_distance&#34;]
     abs_off = self.__params[&#34;abs_offsets&#34;]
     OD_grads = np.log10(near_pd_reads / far_pd_reads) / (d[1] - d[0])
@@ -644,12 +1015,43 @@ svd_clean: bool
 <span>def <span class="ident">calc_hb_concs</span></span>(<span>self, near_pd_reads: numpy.ndarray, far_pd_reads: numpy.ndarray) ‑> list[numpy.ndarray, numpy.ndarray]</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Convert raw PD reads to near and far Hb-concentration changes.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>near_pd_reads: np.ndarray (5 x nobs)
+    The raw data as a 12-channel matrix with each channel as a column vector
+far_pd_reads: np.ndarray (5 x nobs)
+    Whether or not to apply the SVD cleaning on the data
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>conc_near: np.ndarray (2 x nobs)
+    Array of near Hb-concentration changes with rows being O2Hb and HHb respectively.
+
+conc_far: np.ndarray (2 x nobs)
+    Array of far Hb-concentration changes with rows being O2Hb and HHb respectively.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def calc_hb_concs(self, near_pd_reads: np.ndarray, far_pd_reads:np.ndarray) -&gt; list[np.ndarray, np.ndarray]:
+    &#34;&#34;&#34;
+    Convert raw PD reads to near and far Hb-concentration changes.
+
+    Arguments
+    ---------
+        near_pd_reads: np.ndarray (5 x nobs)
+            The raw data as a 12-channel matrix with each channel as a column vector
+        far_pd_reads: np.ndarray (5 x nobs)
+            Whether or not to apply the SVD cleaning on the data
+
+    Returns
+    -------
+        conc_near: np.ndarray (2 x nobs)
+            Array of near Hb-concentration changes with rows being O2Hb and HHb respectively. 
+            
+        conc_far: np.ndarray (2 x nobs)
+            Array of far Hb-concentration changes with rows being O2Hb and HHb respectively. 
+    &#34;&#34;&#34;
 
     A_near_inv = self.__params[&#34;A_near_inv&#34;]
     A_far_inv = self.__params[&#34;A_far_inv&#34;]
@@ -669,28 +1071,44 @@ svd_clean: bool
 <span>def <span class="ident">calc_toi</span></span>(<span>self, near_pd_reads: numpy.ndarray, far_pd_reads: numpy.ndarray, svd_clean=False) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Calculates TOI using coefficients similar to the PLM.</p>
-<p>Function inputs:
-1. Ambient subtracted near PD reads
-2. Ambient subtracted far PD reads</p>
-<p>Function outputs:
-toi</p></div>
+<div class="desc"><p>Calculate TOI fron near and far absorbance data</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>near_pd_reads: np.ndarray (shape=(5, nobs))
+    The near channel absorbance data
+far_pd_reads: np.ndarray (shape=(5, nobs))
+    The far channel absorbance data
+svd_clean: bool (default=True)
+    Whether to apply SVD cleaning to the absorbance data. If True, the SVD is applied simultaneously
+    on the near and far data by stacking them vertically.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>toi: np.ndarray (shape 5 x nobs)
+    Array of log transformed, calibration corrected OD-gradients.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def calc_toi(self, near_pd_reads: np.ndarray, far_pd_reads: np.ndarray, svd_clean=False) -&gt; np.ndarray:
     &#34;&#34;&#34;
-    Calculates TOI using coefficients similar to the PLM.
+    Calculate TOI fron near and far absorbance data
 
-    Function inputs:
-    1. Ambient subtracted near PD reads
-    2. Ambient subtracted far PD reads
+    Arguments
+    ---------
+        near_pd_reads: np.ndarray (shape=(5, nobs))
+            The near channel absorbance data
+        far_pd_reads: np.ndarray (shape=(5, nobs))
+            The far channel absorbance data
+        svd_clean: bool (default=True)
+            Whether to apply SVD cleaning to the absorbance data. If True, the SVD is applied simultaneously
+            on the near and far data by stacking them vertically.
 
-    Function outputs:
-        toi
+    Returns
+    -------
+        toi: np.ndarray (shape 5 x nobs)
+            Array of log transformed, calibration corrected OD-gradients. 
+         
     &#34;&#34;&#34;
-
     OD_grads = self.calc_gradients(near_pd_reads, far_pd_reads)
     
     if svd_clean:
@@ -717,13 +1135,46 @@ toi</p></div>
 <span>def <span class="ident">clean_hbc_toi</span></span>(<span>self, data)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI</p></div>
+<div class="desc"><p>Ambient subtract, clean and convert raw absorbance data.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>data: np.ndarray (shape=(12, nobs))
+    The raw data as a 12-channel matrix with each channel as a row vector.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>near_hb_clean: np.ndarray (shape=(2, nobs))
+    The SVD-cleaned near hb-concentration changes.
+
+far_hb_clean: np.ndarray (shape=(2, nobs))
+    The SVD-cleaned far hb-concentration changes.
+
+toi_clean: np.ndarray (shape=(nobs,))
+    The TOI calculated from the SVD-cleaned near and far absorbances.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def clean_hbc_toi(self, data): #TODO: Take 5WL data and return cleaned data
-    &#34;Takes in the 12 channels from raw NIRS data, returns Hb-concs and TOI&#34;
+<pre><code class="python">def clean_hbc_toi(self, data):
+    &#34;&#34;&#34;
+    Ambient subtract, clean and convert raw absorbance data.
+
+    Arguments
+    ---------
+        data: np.ndarray (shape=(12, nobs))
+            The raw data as a 12-channel matrix with each channel as a row vector. 
+    
+    Returns
+    -------
+        near_hb_clean: np.ndarray (shape=(2, nobs))
+            The SVD-cleaned near hb-concentration changes.
+        
+        far_hb_clean: np.ndarray (shape=(2, nobs))
+            The SVD-cleaned far hb-concentration changes.
+        
+        toi_clean: np.ndarray (shape=(nobs,))
+            The TOI calculated from the SVD-cleaned near and far absorbances.
+    
+    &#34;&#34;&#34;
 
     near, far = self.subtract_ambient(data)
     near_clean, _ = self.svd_clean(near)
@@ -753,14 +1204,32 @@ toi</p></div>
 <span>def <span class="ident">get_pd_reads</span></span>(<span>df) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Get PD reads from Neurokey dataframe returned by NKY-utils.</p></div>
+<div class="desc"><p>Get PD reads from Neurokey dataframe returned by NKY-utils (for online use).</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>df: pd.DataFrame
+    A dataframe with the NKY-derived absorbance values
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>data: np.ndarray (shape=(12, nobs))
+    A numpy array with the absorbance data extraced from the dataframe
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_pd_reads(df) -&gt; np.ndarray:
     &#34;&#34;&#34;
-    Get PD reads from Neurokey dataframe returned by NKY-utils.
+    Get PD reads from Neurokey dataframe returned by NKY-utils (for online use).
+    
+    Arguments
+    ---------
+        df: pd.DataFrame
+            A dataframe with the NKY-derived absorbance values
+    
+    Returns
+    -------
+        data: np.ndarray (shape=(12, nobs))
+            A numpy array with the absorbance data extraced from the dataframe
     &#34;&#34;&#34;
     d = np.empty((len(df), 12))
     d[:, :5] = df.iloc[:, 1:6].to_numpy()
@@ -819,30 +1288,59 @@ toi: np.ndarray
     return near_hbc, far_hbc, toi</code></pre>
 </details>
 </dd>
-<dt id="pynirs.hb_conv.HbConv.ica"><code class="name flex">
-<span>def <span class="ident">ica</span></span>(<span>data)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Perform an Independent Component Analysis based decomposition on raw NIRS</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def ica(data):
-    &#34;Perform an Independent Component Analysis based decomposition on raw NIRS&#34;
-    return &#34;Not Implemented&#34;</code></pre>
-</details>
-</dd>
 <dt id="pynirs.hb_conv.HbConv.subtract_ambient"><code class="name flex">
 <span>def <span class="ident">subtract_ambient</span></span>(<span>self, pd_reads: numpy.ndarray) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Subtracts ambient data from the raw absorbance data.</p>
+<h2 id="agruments">Agruments</h2>
+<pre><code>data: np.ndarray
+    The raw data as a 12-channel matrix with each channel as a column vector
+svd_clean: bool
+    Whether or not to apply the SVD cleaning on the data
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>observed: dict
+    A dictionary of data with the raw and converted data as was recorded.
+
+    raw_data: np.ndarray (shape=(12,nobs))
+        The raw absorbance data
+
+    hb_concs: np.ndarray
+        The predicted values based on the x-data, slope and intercept
+
+    toi: np.ndarray
+        The TOI calculated from the raw absorbance data (after ambient subtraction)
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def subtract_ambient(self, pd_reads: np.ndarray) -&gt; np.ndarray:
+    &#34;&#34;&#34;
+    Subtracts ambient data from the raw absorbance data.
+
+    Agruments
+    ---------
+        data: np.ndarray
+            The raw data as a 12-channel matrix with each channel as a column vector
+        svd_clean: bool
+            Whether or not to apply the SVD cleaning on the data
+
+    Returns
+    -------
+        observed: dict
+            A dictionary of data with the raw and converted data as was recorded. 
+            
+            raw_data: np.ndarray (shape=(12,nobs))
+                The raw absorbance data
+
+            hb_concs: np.ndarray
+                The predicted values based on the x-data, slope and intercept
+            
+            toi: np.ndarray
+                The TOI calculated from the raw absorbance data (after ambient subtraction)
+    &#34;&#34;&#34;
     near_vals = pd_reads[:5, :] - pd_reads[5, :]
     far_vals = pd_reads[6:11, :] - pd_reads[11, :]
     return near_vals, far_vals</code></pre>
@@ -899,16 +1397,57 @@ full_matrices: boolean (default=False)
 </details>
 </dd>
 <dt id="pynirs.hb_conv.HbConv.svd_clean"><code class="name flex">
-<span>def <span class="ident">svd_clean</span></span>(<span>self, data, return_noise=True)</span>
+<span>def <span class="ident">svd_clean</span></span>(<span>self, data, print_uvar=True, return_noise=True) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Clean raw NIRS 5WL data with SVD, return cleaned raw data</p></div>
+<div class="desc"><p>Clean absorbance data with SVD and return cleaned data (and noise, if return_noise is True).</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>data: np.ndarray (shape=(nchannels, nobs))
+    The data to be decomposed with the SVD.
+
+print_uvar: bool (default=True)
+    If True (default), will print the stdev of each column of U enabling quick assessment of cleaning. 
+    If the first value is less than 0.1, cleaning is good.
+
+return_noise: bool (default=True)
+    Whether or not to return the extracted component along with the cleaned data.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>clean_data: np.ndarray (shape=(nchannels, nobs))
+    The cleaned data with the dominant component removed.
+
+noise: np.ndarray (shape=(nobs,))
+    If return_noise is True, will also return the component removed during cleaning
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def svd_clean(self, data, return_noise=True):
-    &#34;Clean raw NIRS 5WL data with SVD, return cleaned raw data&#34;
+<pre><code class="python">def svd_clean(self, data, print_uvar=True, return_noise=True) -&gt; np.ndarray:
+    &#34;&#34;&#34;
+    Clean absorbance data with SVD and return cleaned data (and noise, if return_noise is True).
+
+    Arguments
+    ---------
+        data: np.ndarray (shape=(nchannels, nobs))
+            The data to be decomposed with the SVD.
+        
+        print_uvar: bool (default=True)
+            If True (default), will print the stdev of each column of U enabling quick assessment of cleaning. 
+            If the first value is less than 0.1, cleaning is good.
+        
+        return_noise: bool (default=True)
+            Whether or not to return the extracted component along with the cleaned data.
+    
+    Returns
+    -------
+        clean_data: np.ndarray (shape=(nchannels, nobs))
+            The cleaned data with the dominant component removed.
+
+        noise: np.ndarray (shape=(nobs,))
+            If return_noise is True, will also return the component removed during cleaning
+    
+    &#34;&#34;&#34;
 
     if data.shape[0] &lt; data.shape[1]:
         data = data.T
@@ -918,6 +1457,7 @@ full_matrices: boolean (default=False)
     raw_data_mc = raw_data - raw_data_means
 
     u,s,v = np.linalg.svd(raw_data_mc.T, full_matrices=False)
+    if print_uvar: print(np.std(u, axis=0))
     
     noise = np.mean(u[:,0])*v[0,:]
     rec = u[:,1:-1] @ np.diag(s[1:-1]) @ v[1:-1,:]
@@ -958,7 +1498,6 @@ full_matrices: boolean (default=False)
 <li><code><a title="pynirs.hb_conv.HbConv.get_params" href="#pynirs.hb_conv.HbConv.get_params">get_params</a></code></li>
 <li><code><a title="pynirs.hb_conv.HbConv.get_pd_reads" href="#pynirs.hb_conv.HbConv.get_pd_reads">get_pd_reads</a></code></li>
 <li><code><a title="pynirs.hb_conv.HbConv.hbc_from_abs" href="#pynirs.hb_conv.HbConv.hbc_from_abs">hbc_from_abs</a></code></li>
-<li><code><a title="pynirs.hb_conv.HbConv.ica" href="#pynirs.hb_conv.HbConv.ica">ica</a></code></li>
 <li><code><a title="pynirs.hb_conv.HbConv.subtract_ambient" href="#pynirs.hb_conv.HbConv.subtract_ambient">subtract_ambient</a></code></li>
 <li><code><a title="pynirs.hb_conv.HbConv.svd" href="#pynirs.hb_conv.HbConv.svd">svd</a></code></li>
 <li><code><a title="pynirs.hb_conv.HbConv.svd_clean" href="#pynirs.hb_conv.HbConv.svd_clean">svd_clean</a></code></li>
