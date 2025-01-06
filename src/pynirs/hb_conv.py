@@ -468,13 +468,18 @@ class HbConvert:
 
 
 if __name__ == "__main__":
+    # Example use of functionality
+
+    # Imports
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
     
+    # Load some data
     pd_reads = pd.read_csv('./src/pynirs/data/test_data.csv').to_numpy().T  
     hb = HbConvert(pd_reads)
-        
+
+    # Plot the data    
     plt.subplots(3, 1, sharex=True, sharey=True)
     plt.subplot(311)
     plt.plot(hb.observed.toi)
