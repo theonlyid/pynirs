@@ -38,7 +38,6 @@ Date: 27-June-2024
 &#34;&#34;&#34;
 
 import numpy as np
-from typing import NamedTuple
 
 class Param:
     &#34;&#34;&#34;An object to store the parameters returned by the Sigmoid.fit() method.
@@ -62,10 +61,7 @@ class Param:
         self.rsquare=rsquare
 
     def __repr__(self) -&gt; str:
-         r = f&#34;Params(means:{self.means}, R-square:{self.rsquare:0.2f})&#34;
-
-# TODO: implement TTestResult Tuple
-# TTestResult = NamedTuple(&#39;TTestResult&#39;, [&#39;T-statistic&#39;, &#39;p-value&#39;])</code></pre>
+         r = f&#34;Params(means:{self.means}, R-square:{self.rsquare:0.2f})&#34;</code></pre>
 </details>
 </section>
 <section>

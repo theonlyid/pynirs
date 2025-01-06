@@ -1,6 +1,6 @@
 # PYNIRS - a library for analysis of NIRS and IP timeseries data
 
-Version: 0.0.1
+Version: 0.3.1
 
 Author: Ali Zaidi
 

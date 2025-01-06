@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name="pynirs",
-    version="0.0.2",
+    version="0.3.1",
     description="Package for analysis of nirs or IP timeseries data",
     author="Ali Zaidi",
     author_email="zaidi@icord.org",

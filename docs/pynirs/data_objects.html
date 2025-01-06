@@ -23,8 +23,8 @@
 </header>
 <section id="section-intro">
 <p>This submodule contains the class definitions and methods for loading and working with NIRS experiments and events.</p>
-<p>Author: Ali Zaidi
-Date: 20-June-2024</p>
+<p>Author: Ali Zaidi</p>
+<p>Date: 20-June-2024</p>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -33,6 +33,7 @@ Date: 20-June-2024</p>
 This submodule contains the class definitions and methods for loading and working with NIRS experiments and events.
 
 Author: Ali Zaidi
+
 Date: 20-June-2024
 &#34;&#34;&#34;
 
@@ -51,6 +52,20 @@ class Experiment:
     &#34;&#34;&#34;
 
     def __init__(self, source, auto_resample=True, extract_ne=True, fs=100):
+        &#34;&#34;&#34;
+        Initialize the Experiment object with data from a source.
+
+        Arguments
+        ---------
+            source: str or pd.DataFrame
+                The source of the data, either a file path or a pandas DataFrame.
+            auto_resample: bool (default=True)
+                Whether to automatically resample the data.
+            extract_ne: bool (default=True)
+                Whether to extract NE dose information.
+            fs: int (default=100)
+                The sampling frequency of the data.
+        &#34;&#34;&#34;
         self._log = []
         self.__log(&#34;Instantiating Experiment object&#34;)
         self.fs = fs
@@ -68,17 +83,45 @@ class Experiment:
             self.resample(1)
 
     def __log(self, statement):
+        &#34;&#34;&#34;
+        Append a log statement to the internal log and print it.
+
+        Arguments
+        ---------
+            statement: str
+                The log statement to be appended and printed.
+        &#34;&#34;&#34;
         self._log.append(statement)
         print(statement)
 
     def get_log(self):
-        &#34;&#34;&#34;Returns the log of the experiment object&#34;&#34;&#34;
+        &#34;&#34;&#34;
+        Return the log of the experiment object.
+
+        Returns
+        -------
+            log: list
+                A list of log statements.
+        &#34;&#34;&#34;
         return self._log
 
-
-    def load_file(self, filename: str, repace_data=True) -&gt; list[pd.DataFrame]:
+    def load_file(self, filename: str, replace_data=True) -&gt; list[pd.DataFrame]:
         &#34;&#34;&#34;
-        Loads a CSV file and converts it to a pandas dataframe.
+        Load a CSV file and convert it to a pandas DataFrame.
+
+        Arguments
+        ---------
+            filename: str
+                The path to the CSV file to be loaded.
+            replace_data: bool (default=True)
+                Whether to replace the existing data with the loaded data.
+
+        Returns
+        -------
+            data: pd.DataFrame
+                The loaded data as a pandas DataFrame.
+            comments: pd.Series
+                The comments extracted from the data.
         &#34;&#34;&#34;
         self.__log(f&#34;Loading {filename}&#34;)
         data = pd.read_csv(filename, low_memory=False)
@@ -87,27 +130,54 @@ class Experiment:
         comments = comments[~comments.isna()].copy()
         return data, comments
     
-    def from_dataframe(self, data: pd.DataFrame, repace_data=True) -&gt; list[pd.DataFrame]:
+    def from_dataframe(self, data: pd.DataFrame, fs: float = 1.0, replace_data=True) -&gt; list[pd.DataFrame]:
         &#34;&#34;&#34;
         Create an Experiment object from a pandas DataFrame.
+
+        Arguments
+        ---------
+            data: pd.DataFrame
+                The data to be used for creating the Experiment object.
+            fs: float (default=1.0)
+                The sampling frequency of the data.
+            replace_data: bool (default=True)
+                Whether to replace the existing data with the provided data.
+
+        Returns
+        -------
+            data: pd.DataFrame
+                The processed data as a pandas DataFrame.
+            comments: pd.Series
+                The comments extracted from the data.
         &#34;&#34;&#34;
+
+        # Run some basic checks on the data
+        if &#39;comments&#39; not in data.columns:
+            raise ValueError(&#34;Dataframe must contain a &#39;comments&#39; column.&#34;)
+        
         self.__log(f&#34;Generating from dataframe: {data}&#34;)
         self.data = data
         comments = data.pop(&#39;comments&#39;)
-        data.pop(&#39;datetime&#39;)
         comments = comments[~comments.isna()].copy()
+
+        if &#34;datetime&#34; in data.columns:
+            data.pop(&#39;datetime&#39;)
+        
+        if &#34;ts&#34; not in data.columns:
+            data[&#34;ts&#34;] = np.arange(0, 1/fs, data.shape[0]/fs)
+            
         return data, comments
 
     def extract_NE(self):
         &#34;&#34;&#34;
-        Crawls through the comments to isolate NE-dose and generates its timeseries, appending &#39;NE dose&#39; it to self.data
+        Crawl through the comments to isolate NE-dose and generate its timeseries, appending &#39;NE dose&#39; to self.data.
         &#34;&#34;&#34;
         self.__log(&#34;Extracting NE&#34;)
         tmp = self.comments.str.extract(r&#39;(?P&lt;event&gt;NE.+)(?P&lt;dose&gt;\d\.\d{2}|Off)&#39;)
-        tmp = tmp[~tmp.iloc[:,0].isna()]
+        tmp = tmp[~tmp.iloc[:, 0].isna()]
 
-        tmp.iloc[-1,0] = &#39;NE Off&#39;
-        tmp.iloc[-1,-1] = 0
+        tmp.iloc[-1, 0] = &#39;NE Off&#39;
+        tmp.iloc[-1, -1] = 0
         ne_dose = np.zeros((self.data.shape[0],))
         for i in tmp.index.to_numpy():
             ne_dose[i:] = tmp[&#39;dose&#39;][i]
@@ -115,25 +185,44 @@ class Experiment:
 
     def get_challenges(self):
         &#34;&#34;&#34;
-        Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.
+        Crawl through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc.) and return indices.
+
+        Returns
+        -------
+            challenges: pd.DataFrame
+                A DataFrame containing the identified challenges with their start and end indices and durations.
         &#34;&#34;&#34;
         self.__log(&#34;Extracting physiological challenges&#34;)
-        challenges=[]
-        tmp  = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
+        challenges = []
+        tmp = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
         tmp = tmp[~tmp[&#39;challenge&#39;].isna()]
         for challenge in tmp.challenge.unique():
-            print(challenge)
             if len(tmp[tmp[&#39;challenge&#39;] == challenge].index):
-                start, end = tmp[tmp[&#39;challenge&#39;]==challenge].index
-            challenges.append([challenge, start, end, end-start+1])
+                start, end = tmp[tmp[&#39;challenge&#39;] == challenge].index
+            challenges.append([challenge, start, end, end - start + 1])
         challenges = pd.DataFrame(challenges, columns=[&#39;challenge&#39;, &#39;start&#39;, &#39;end&#39;, &#39;duration&#39;])
         self.challenges = challenges
         return self.challenges
     
     def challenges_to_events(self, pre=60, post=60):
+        &#34;&#34;&#34;
+        Convert identified challenges to Event objects.
+
+        Arguments
+        ---------
+            pre: int (default=60)
+                The number of seconds to include before the start of each challenge.
+            post: int (default=60)
+                The number of seconds to include after the end of each challenge.
+
+        Returns
+        -------
+            events: dict
+                A dictionary of Event objects for each identified challenge.
+        &#34;&#34;&#34;
         events = {}
         for i in range(len(self.challenges.challenge)):
-            tmp = self.challenges.iloc[i,:]
+            tmp = self.challenges.iloc[i, :]
             tmp_challenge = Event(self, tmp.start, tmp.end, pre=pre, post=post)
             tmp_challenge.calc_features()
             events[tmp.challenge] = tmp_challenge
@@ -143,13 +232,18 @@ class Experiment:
     def resample(self, fs_new):
         &#34;&#34;&#34;
         Resample data to the given sampling rate.
+
+        Arguments
+        ---------
+            fs_new: float
+                The new sampling rate to resample the data to.
         &#34;&#34;&#34;
         self.__log(f&#34;Resampling from {self.fs:0.2f} to {fs_new:0.2f} Hz&#34;)
         nsamples = np.int16(self.data.shape[0] * fs_new // self.fs)
         d_np = self.data.to_numpy()
         d_r = signal.resample(d_np, nsamples, axis=0)
         df_r = pd.DataFrame(d_r, columns=self.data.columns)
-        ts = np.arange(0, d_r.shape[0]/fs_new, 1/fs_new)
+        ts = np.arange(0, d_r.shape[0] / fs_new, 1 / fs_new)
         df_r[&#39;ts&#39;] = ts
         self.data = df_r
         self._comments = self.comments.copy()
@@ -158,23 +252,47 @@ class Experiment:
         _comments.index = _comments.index.to_numpy() * fs_new // self.fs
         self.comments = _comments
         self.fs = fs_new
-        # self.extract_NE()
 
     def get_fft(self, n=2048):
-        self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
-        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
-        xf = fft.fftfreq(n, 1/self.fs)
+        &#34;&#34;&#34;
+        Generate the Fast Fourier Transform (FFT) of the data.
 
-        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[1:])
-        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        Arguments
+        ---------
+            n: int (default=2048)
+                The number of points to use for the FFT.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:, 1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1 / self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf) // 2, :], columns=self.data.columns[1:])
+        fft_df[&#39;f&#39;] = xf[:len(xf) // 2]
         self.fft = fft_df
 
     def butter(self, order=2, wn=1/10, fs=1, btype=&#39;lowpass&#39;):
-        b, a = signal.butter(2, wn, fs=fs, btype=btype)
-        self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;:fs, &#39;btype&#39;:btype, &#39;b&#39;: b, &#39;a&#39;:a}
+        &#34;&#34;&#34;
+        Generate a Butterworth filter.
+
+        Arguments
+        ---------
+            order: int (default=2)
+                The order of the filter.
+            wn: float (default=1/10)
+                The critical frequency.
+            fs: float (default=1)
+                The sampling frequency.
+            btype: str (default=&#39;lowpass&#39;)
+                The type of filter to generate (&#39;lowpass&#39;, &#39;highpass&#39;, &#39;bandpass&#39;, &#39;bandstop&#39;).
+        &#34;&#34;&#34;
+        b, a = signal.butter(order, wn, fs=fs, btype=btype)
+        self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;: fs, &#39;btype&#39;: btype, &#39;b&#39;: b, &#39;a&#39;: a}
         self.__log(f&#34;Generated Butterworth filter. Params:{self.filter_params}&#34;)
 
     def filter(self):
+        &#34;&#34;&#34;
+        Apply the generated filter to the data.
+        &#34;&#34;&#34;
         if self.filter_params is None:
             print(&#34;[ERROR] First call Experiment.butter() to generate a filter before filtering data.&#34;)
             return
@@ -182,9 +300,9 @@ class Experiment:
         self.__log(f&#34;Filtering data with {self.filter_params[&#39;btype&#39;]} {self.filter_params[&#39;Wn&#39;]} Hz&#34;)
 
         data = self.data.to_numpy()
-        ts = data[:,0]
+        ts = data[:, 0]
 
-        if (self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;):
+        if self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;:
             data = data - data.mean(axis=0)
 
         b = self.filter_params[&#39;b&#39;]
@@ -200,14 +318,21 @@ class Experiment:
         &#34;&#34;&#34;
         Reset data to the original dataframe generated when the object was instantiated.
         &#34;&#34;&#34;
-        self.__log(&#34;Reseting data to original values loaded from file.&#34;)
+        self.__log(&#34;Resetting data to original values loaded from file.&#34;)
         self.data = self._data.copy()
         self.comments = self._comments.copy()
-        self.filter_params=None
+        self.filter_params = None
         self.fs = 100
 
     def save(self, filename):
-        &#34;Save pickled object&#34;
+        &#34;&#34;&#34;
+        Save the object as a pickled file.
+
+        Arguments
+        ---------
+            filename: str
+                The path to save the pickled object.
+        &#34;&#34;&#34;
         self.__log(f&#34;Saving object as {filename}&#34;)
         with open(filename, &#34;wb&#34;) as f:
             pickle.dump(self, f)
@@ -215,49 +340,86 @@ class Experiment:
     def __repr__(self):
         return f&#34;Dataset loaded from {self.filename} with {self.data.shape[0]} samples and fs={self.fs}&#34;
 
+
 class Event:
     &#34;&#34;&#34;
-    A class for working with instances of physiological challenges such as hypoxias, map-manipulations, etc.
-    Has methods that enable the estimation of feautures such as the area under the curve, cumsums and sigmoid-fits.
+    A class for working with instances of physiological challenges such as hypoxias, MAP manipulations, etc.
+    Has methods that enable the estimation of features such as the area under the curve, cumulative sums, and sigmoid fits.
     &#34;&#34;&#34;
     def __init__(self, dataset: Experiment = None, start=0, stop=-1, pre=0, post=0, detrend=False):
+        &#34;&#34;&#34;
+        Initialize the Event object with data from an Experiment object.
+
+        Arguments
+        ---------
+            dataset: Experiment
+                The Experiment object containing the data.
+            start: int (default=0)
+                The start index of the event.
+            stop: int (default=-1)
+                The stop index of the event.
+            pre: int (default=0)
+                The number of seconds to include before the start of the event.
+            post: int (default=0)
+                The number of seconds to include after the end of the event.
+            detrend: bool (default=False)
+                Whether to detrend the data.
+        &#34;&#34;&#34;
         print(&#34;Instantiating Event object&#34;)
         self.fs = dataset.fs
-        data = dataset.data.iloc[start-pre*self.fs:stop+post*self.fs,:].copy()
+        data = dataset.data.iloc[start - pre * self.fs:stop + post * self.fs, :].copy()
         data = data - data.iloc[:pre, :].mean(axis=0)
-        self.init_params = {&#39;pre&#39;: pre, &#39;start&#39;:start, &#39;stop&#39;: stop, &#39;post&#39;: post, &#39;detrend&#39;: detrend, &#39;Experiment&#39;: dataset.__repr__()}
+        self.init_params = {&#39;pre&#39;: pre, &#39;start&#39;: start, &#39;stop&#39;: stop, &#39;post&#39;: post, &#39;detrend&#39;: detrend, &#39;Experiment&#39;: dataset.__repr__()}
         data[&#39;ts&#39;] = data[&#39;ts&#39;] - data[&#39;ts&#39;].iloc[pre]
         data.set_index(&#39;ts&#39;, inplace=True, drop=False)
         self.data = data
-        self.duration = (stop - start + 1)/self.fs
+        self.duration = (stop - start + 1) / self.fs
         self.calc_features()
         if detrend:
             self.detrend()
 
-
     def detrend(self):
-        _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type=&#39;linear&#39;)
-        self.data.iloc[:,1:] = _d.iloc[:,1:]
-
+        &#34;&#34;&#34;
+        Detrend the data using a linear detrend.
+        &#34;&#34;&#34;
+        _d = signal.detrend(self.data.to_numpy(), axis=0, type=&#39;linear&#39;)
+        self.data.iloc[:, 1:] = _d[:, 1:]
 
     def get_fft(self, n=2048):
-        self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
-        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
-        xf = fft.fftfreq(n, 1/self.fs)
+        &#34;&#34;&#34;
+        Generate the Fast Fourier Transform (FFT) of the event data.
 
-        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[2:])
-        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        Arguments
+        ---------
+            n: int (default=2048)
+                The number of points to use for the FFT.
+        &#34;&#34;&#34;
+        self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:, 1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1 / self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf) // 2, :], columns=self.data.columns[2:])
+        fft_df[&#39;f&#39;] = xf[:len(xf) // 2]
         self.fft = fft_df
 
-
     def calc_features(self):
+        &#34;&#34;&#34;
+        Calculate features such as the sum and cumulative sum of the event data.
+        &#34;&#34;&#34;
         z_data = (self.data - self.data.iloc[:self.init_params[&#39;pre&#39;], :].mean(axis=0)).copy()
-        f_sum = z_data.sum(axis=0).copy()/self.fs
-        f_cumsum =z_data.cumsum(axis=0).copy()/self.fs
+        f_sum = z_data.sum(axis=0).copy() / self.fs
+        f_cumsum = z_data.cumsum(axis=0).copy() / self.fs
         self.features = {&#39;data&#39;: z_data, &#39;sum&#39;: f_sum, &#39;cumsum&#39;: f_cumsum}
-        
 
     def save(self, object_name):
+        &#34;&#34;&#34;
+        Save the Event object as a pickled file.
+
+        Arguments
+        ---------
+            object_name: str
+                The path to save the pickled Event object.
+        &#34;&#34;&#34;
         with open(object_name, &#34;wb&#34;) as f:
             pickle.dump(self, f)
 
@@ -279,55 +441,106 @@ class Event:
 <span>(</span><span>dataset: <a title="pynirs.data_objects.Experiment" href="#pynirs.data_objects.Experiment">Experiment</a> = None, start=0, stop=-1, pre=0, post=0, detrend=False)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A class for working with instances of physiological challenges such as hypoxias, map-manipulations, etc.
-Has methods that enable the estimation of feautures such as the area under the curve, cumsums and sigmoid-fits.</p></div>
+<div class="desc"><p>A class for working with instances of physiological challenges such as hypoxias, MAP manipulations, etc.
+Has methods that enable the estimation of features such as the area under the curve, cumulative sums, and sigmoid fits.</p>
+<p>Initialize the Event object with data from an Experiment object.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>dataset: Experiment
+    The Experiment object containing the data.
+start: int (default=0)
+    The start index of the event.
+stop: int (default=-1)
+    The stop index of the event.
+pre: int (default=0)
+    The number of seconds to include before the start of the event.
+post: int (default=0)
+    The number of seconds to include after the end of the event.
+detrend: bool (default=False)
+    Whether to detrend the data.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Event:
     &#34;&#34;&#34;
-    A class for working with instances of physiological challenges such as hypoxias, map-manipulations, etc.
-    Has methods that enable the estimation of feautures such as the area under the curve, cumsums and sigmoid-fits.
+    A class for working with instances of physiological challenges such as hypoxias, MAP manipulations, etc.
+    Has methods that enable the estimation of features such as the area under the curve, cumulative sums, and sigmoid fits.
     &#34;&#34;&#34;
     def __init__(self, dataset: Experiment = None, start=0, stop=-1, pre=0, post=0, detrend=False):
+        &#34;&#34;&#34;
+        Initialize the Event object with data from an Experiment object.
+
+        Arguments
+        ---------
+            dataset: Experiment
+                The Experiment object containing the data.
+            start: int (default=0)
+                The start index of the event.
+            stop: int (default=-1)
+                The stop index of the event.
+            pre: int (default=0)
+                The number of seconds to include before the start of the event.
+            post: int (default=0)
+                The number of seconds to include after the end of the event.
+            detrend: bool (default=False)
+                Whether to detrend the data.
+        &#34;&#34;&#34;
         print(&#34;Instantiating Event object&#34;)
         self.fs = dataset.fs
-        data = dataset.data.iloc[start-pre*self.fs:stop+post*self.fs,:].copy()
+        data = dataset.data.iloc[start - pre * self.fs:stop + post * self.fs, :].copy()
         data = data - data.iloc[:pre, :].mean(axis=0)
-        self.init_params = {&#39;pre&#39;: pre, &#39;start&#39;:start, &#39;stop&#39;: stop, &#39;post&#39;: post, &#39;detrend&#39;: detrend, &#39;Experiment&#39;: dataset.__repr__()}
+        self.init_params = {&#39;pre&#39;: pre, &#39;start&#39;: start, &#39;stop&#39;: stop, &#39;post&#39;: post, &#39;detrend&#39;: detrend, &#39;Experiment&#39;: dataset.__repr__()}
         data[&#39;ts&#39;] = data[&#39;ts&#39;] - data[&#39;ts&#39;].iloc[pre]
         data.set_index(&#39;ts&#39;, inplace=True, drop=False)
         self.data = data
-        self.duration = (stop - start + 1)/self.fs
+        self.duration = (stop - start + 1) / self.fs
         self.calc_features()
         if detrend:
             self.detrend()
 
-
     def detrend(self):
-        _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type=&#39;linear&#39;)
-        self.data.iloc[:,1:] = _d.iloc[:,1:]
-
+        &#34;&#34;&#34;
+        Detrend the data using a linear detrend.
+        &#34;&#34;&#34;
+        _d = signal.detrend(self.data.to_numpy(), axis=0, type=&#39;linear&#39;)
+        self.data.iloc[:, 1:] = _d[:, 1:]
 
     def get_fft(self, n=2048):
-        self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
-        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
-        xf = fft.fftfreq(n, 1/self.fs)
+        &#34;&#34;&#34;
+        Generate the Fast Fourier Transform (FFT) of the event data.
 
-        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[2:])
-        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        Arguments
+        ---------
+            n: int (default=2048)
+                The number of points to use for the FFT.
+        &#34;&#34;&#34;
+        self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:, 1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1 / self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf) // 2, :], columns=self.data.columns[2:])
+        fft_df[&#39;f&#39;] = xf[:len(xf) // 2]
         self.fft = fft_df
 
-
     def calc_features(self):
+        &#34;&#34;&#34;
+        Calculate features such as the sum and cumulative sum of the event data.
+        &#34;&#34;&#34;
         z_data = (self.data - self.data.iloc[:self.init_params[&#39;pre&#39;], :].mean(axis=0)).copy()
-        f_sum = z_data.sum(axis=0).copy()/self.fs
-        f_cumsum =z_data.cumsum(axis=0).copy()/self.fs
+        f_sum = z_data.sum(axis=0).copy() / self.fs
+        f_cumsum = z_data.cumsum(axis=0).copy() / self.fs
         self.features = {&#39;data&#39;: z_data, &#39;sum&#39;: f_sum, &#39;cumsum&#39;: f_cumsum}
-        
 
     def save(self, object_name):
+        &#34;&#34;&#34;
+        Save the Event object as a pickled file.
+
+        Arguments
+        ---------
+            object_name: str
+                The path to save the pickled Event object.
+        &#34;&#34;&#34;
         with open(object_name, &#34;wb&#34;) as f:
             pickle.dump(self, f)
 
@@ -340,15 +553,18 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">calc_features</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Calculate features such as the sum and cumulative sum of the event data.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def calc_features(self):
+    &#34;&#34;&#34;
+    Calculate features such as the sum and cumulative sum of the event data.
+    &#34;&#34;&#34;
     z_data = (self.data - self.data.iloc[:self.init_params[&#39;pre&#39;], :].mean(axis=0)).copy()
-    f_sum = z_data.sum(axis=0).copy()/self.fs
-    f_cumsum =z_data.cumsum(axis=0).copy()/self.fs
+    f_sum = z_data.sum(axis=0).copy() / self.fs
+    f_cumsum = z_data.cumsum(axis=0).copy() / self.fs
     self.features = {&#39;data&#39;: z_data, &#39;sum&#39;: f_sum, &#39;cumsum&#39;: f_cumsum}</code></pre>
 </details>
 </dd>
@@ -356,32 +572,47 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">detrend</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Detrend the data using a linear detrend.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def detrend(self):
-    _d = signal.detrend(self.data.iloc.to_numpy(), axis=0, type=&#39;linear&#39;)
-    self.data.iloc[:,1:] = _d.iloc[:,1:]</code></pre>
+    &#34;&#34;&#34;
+    Detrend the data using a linear detrend.
+    &#34;&#34;&#34;
+    _d = signal.detrend(self.data.to_numpy(), axis=0, type=&#39;linear&#39;)
+    self.data.iloc[:, 1:] = _d[:, 1:]</code></pre>
 </details>
 </dd>
 <dt id="pynirs.data_objects.Event.get_fft"><code class="name flex">
 <span>def <span class="ident">get_fft</span></span>(<span>self, n=2048)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Generate the Fast Fourier Transform (FFT) of the event data.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>n: int (default=2048)
+    The number of points to use for the FFT.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_fft(self, n=2048):
-    self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
-    fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
-    xf = fft.fftfreq(n, 1/self.fs)
+    &#34;&#34;&#34;
+    Generate the Fast Fourier Transform (FFT) of the event data.
 
-    fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[2:])
-    fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+    Arguments
+    ---------
+        n: int (default=2048)
+            The number of points to use for the FFT.
+    &#34;&#34;&#34;
+    self.log(f&#34;Generating FFT with fs={self.fs}&#34;)
+    fx = fft.fft(self.data.iloc[:, 1:].to_numpy(), n, axis=0)
+    xf = fft.fftfreq(n, 1 / self.fs)
+
+    fft_df = pd.DataFrame(fx[:len(xf) // 2, :], columns=self.data.columns[2:])
+    fft_df[&#39;f&#39;] = xf[:len(xf) // 2]
     self.fft = fft_df</code></pre>
 </details>
 </dd>
@@ -389,12 +620,24 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">save</span></span>(<span>self, object_name)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Save the Event object as a pickled file.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>object_name: str
+    The path to save the pickled Event object.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def save(self, object_name):
+    &#34;&#34;&#34;
+    Save the Event object as a pickled file.
+
+    Arguments
+    ---------
+        object_name: str
+            The path to save the pickled Event object.
+    &#34;&#34;&#34;
     with open(object_name, &#34;wb&#34;) as f:
         pickle.dump(self, f)</code></pre>
 </details>
@@ -406,7 +649,18 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>(</span><span>source, auto_resample=True, extract_ne=True, fs=100)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>A class for loading and manipulating timeseries data from a CSV file. Has methods to allow resampling, filtering, etc.</p></div>
+<div class="desc"><p>A class for loading and manipulating timeseries data from a CSV file. Has methods to allow resampling, filtering, etc.</p>
+<p>Initialize the Experiment object with data from a source.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>source: str or pd.DataFrame
+    The source of the data, either a file path or a pandas DataFrame.
+auto_resample: bool (default=True)
+    Whether to automatically resample the data.
+extract_ne: bool (default=True)
+    Whether to extract NE dose information.
+fs: int (default=100)
+    The sampling frequency of the data.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -417,6 +671,20 @@ Has methods that enable the estimation of feautures such as the area under the c
     &#34;&#34;&#34;
 
     def __init__(self, source, auto_resample=True, extract_ne=True, fs=100):
+        &#34;&#34;&#34;
+        Initialize the Experiment object with data from a source.
+
+        Arguments
+        ---------
+            source: str or pd.DataFrame
+                The source of the data, either a file path or a pandas DataFrame.
+            auto_resample: bool (default=True)
+                Whether to automatically resample the data.
+            extract_ne: bool (default=True)
+                Whether to extract NE dose information.
+            fs: int (default=100)
+                The sampling frequency of the data.
+        &#34;&#34;&#34;
         self._log = []
         self.__log(&#34;Instantiating Experiment object&#34;)
         self.fs = fs
@@ -434,17 +702,45 @@ Has methods that enable the estimation of feautures such as the area under the c
             self.resample(1)
 
     def __log(self, statement):
+        &#34;&#34;&#34;
+        Append a log statement to the internal log and print it.
+
+        Arguments
+        ---------
+            statement: str
+                The log statement to be appended and printed.
+        &#34;&#34;&#34;
         self._log.append(statement)
         print(statement)
 
     def get_log(self):
-        &#34;&#34;&#34;Returns the log of the experiment object&#34;&#34;&#34;
+        &#34;&#34;&#34;
+        Return the log of the experiment object.
+
+        Returns
+        -------
+            log: list
+                A list of log statements.
+        &#34;&#34;&#34;
         return self._log
 
-
-    def load_file(self, filename: str, repace_data=True) -&gt; list[pd.DataFrame]:
+    def load_file(self, filename: str, replace_data=True) -&gt; list[pd.DataFrame]:
         &#34;&#34;&#34;
-        Loads a CSV file and converts it to a pandas dataframe.
+        Load a CSV file and convert it to a pandas DataFrame.
+
+        Arguments
+        ---------
+            filename: str
+                The path to the CSV file to be loaded.
+            replace_data: bool (default=True)
+                Whether to replace the existing data with the loaded data.
+
+        Returns
+        -------
+            data: pd.DataFrame
+                The loaded data as a pandas DataFrame.
+            comments: pd.Series
+                The comments extracted from the data.
         &#34;&#34;&#34;
         self.__log(f&#34;Loading {filename}&#34;)
         data = pd.read_csv(filename, low_memory=False)
@@ -453,27 +749,54 @@ Has methods that enable the estimation of feautures such as the area under the c
         comments = comments[~comments.isna()].copy()
         return data, comments
     
-    def from_dataframe(self, data: pd.DataFrame, repace_data=True) -&gt; list[pd.DataFrame]:
+    def from_dataframe(self, data: pd.DataFrame, fs: float = 1.0, replace_data=True) -&gt; list[pd.DataFrame]:
         &#34;&#34;&#34;
         Create an Experiment object from a pandas DataFrame.
+
+        Arguments
+        ---------
+            data: pd.DataFrame
+                The data to be used for creating the Experiment object.
+            fs: float (default=1.0)
+                The sampling frequency of the data.
+            replace_data: bool (default=True)
+                Whether to replace the existing data with the provided data.
+
+        Returns
+        -------
+            data: pd.DataFrame
+                The processed data as a pandas DataFrame.
+            comments: pd.Series
+                The comments extracted from the data.
         &#34;&#34;&#34;
+
+        # Run some basic checks on the data
+        if &#39;comments&#39; not in data.columns:
+            raise ValueError(&#34;Dataframe must contain a &#39;comments&#39; column.&#34;)
+        
         self.__log(f&#34;Generating from dataframe: {data}&#34;)
         self.data = data
         comments = data.pop(&#39;comments&#39;)
-        data.pop(&#39;datetime&#39;)
         comments = comments[~comments.isna()].copy()
+
+        if &#34;datetime&#34; in data.columns:
+            data.pop(&#39;datetime&#39;)
+        
+        if &#34;ts&#34; not in data.columns:
+            data[&#34;ts&#34;] = np.arange(0, 1/fs, data.shape[0]/fs)
+            
         return data, comments
 
     def extract_NE(self):
         &#34;&#34;&#34;
-        Crawls through the comments to isolate NE-dose and generates its timeseries, appending &#39;NE dose&#39; it to self.data
+        Crawl through the comments to isolate NE-dose and generate its timeseries, appending &#39;NE dose&#39; to self.data.
         &#34;&#34;&#34;
         self.__log(&#34;Extracting NE&#34;)
         tmp = self.comments.str.extract(r&#39;(?P&lt;event&gt;NE.+)(?P&lt;dose&gt;\d\.\d{2}|Off)&#39;)
-        tmp = tmp[~tmp.iloc[:,0].isna()]
+        tmp = tmp[~tmp.iloc[:, 0].isna()]
 
-        tmp.iloc[-1,0] = &#39;NE Off&#39;
-        tmp.iloc[-1,-1] = 0
+        tmp.iloc[-1, 0] = &#39;NE Off&#39;
+        tmp.iloc[-1, -1] = 0
         ne_dose = np.zeros((self.data.shape[0],))
         for i in tmp.index.to_numpy():
             ne_dose[i:] = tmp[&#39;dose&#39;][i]
@@ -481,25 +804,44 @@ Has methods that enable the estimation of feautures such as the area under the c
 
     def get_challenges(self):
         &#34;&#34;&#34;
-        Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.
+        Crawl through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc.) and return indices.
+
+        Returns
+        -------
+            challenges: pd.DataFrame
+                A DataFrame containing the identified challenges with their start and end indices and durations.
         &#34;&#34;&#34;
         self.__log(&#34;Extracting physiological challenges&#34;)
-        challenges=[]
-        tmp  = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
+        challenges = []
+        tmp = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
         tmp = tmp[~tmp[&#39;challenge&#39;].isna()]
         for challenge in tmp.challenge.unique():
-            print(challenge)
             if len(tmp[tmp[&#39;challenge&#39;] == challenge].index):
-                start, end = tmp[tmp[&#39;challenge&#39;]==challenge].index
-            challenges.append([challenge, start, end, end-start+1])
+                start, end = tmp[tmp[&#39;challenge&#39;] == challenge].index
+            challenges.append([challenge, start, end, end - start + 1])
         challenges = pd.DataFrame(challenges, columns=[&#39;challenge&#39;, &#39;start&#39;, &#39;end&#39;, &#39;duration&#39;])
         self.challenges = challenges
         return self.challenges
     
     def challenges_to_events(self, pre=60, post=60):
+        &#34;&#34;&#34;
+        Convert identified challenges to Event objects.
+
+        Arguments
+        ---------
+            pre: int (default=60)
+                The number of seconds to include before the start of each challenge.
+            post: int (default=60)
+                The number of seconds to include after the end of each challenge.
+
+        Returns
+        -------
+            events: dict
+                A dictionary of Event objects for each identified challenge.
+        &#34;&#34;&#34;
         events = {}
         for i in range(len(self.challenges.challenge)):
-            tmp = self.challenges.iloc[i,:]
+            tmp = self.challenges.iloc[i, :]
             tmp_challenge = Event(self, tmp.start, tmp.end, pre=pre, post=post)
             tmp_challenge.calc_features()
             events[tmp.challenge] = tmp_challenge
@@ -509,13 +851,18 @@ Has methods that enable the estimation of feautures such as the area under the c
     def resample(self, fs_new):
         &#34;&#34;&#34;
         Resample data to the given sampling rate.
+
+        Arguments
+        ---------
+            fs_new: float
+                The new sampling rate to resample the data to.
         &#34;&#34;&#34;
         self.__log(f&#34;Resampling from {self.fs:0.2f} to {fs_new:0.2f} Hz&#34;)
         nsamples = np.int16(self.data.shape[0] * fs_new // self.fs)
         d_np = self.data.to_numpy()
         d_r = signal.resample(d_np, nsamples, axis=0)
         df_r = pd.DataFrame(d_r, columns=self.data.columns)
-        ts = np.arange(0, d_r.shape[0]/fs_new, 1/fs_new)
+        ts = np.arange(0, d_r.shape[0] / fs_new, 1 / fs_new)
         df_r[&#39;ts&#39;] = ts
         self.data = df_r
         self._comments = self.comments.copy()
@@ -524,23 +871,47 @@ Has methods that enable the estimation of feautures such as the area under the c
         _comments.index = _comments.index.to_numpy() * fs_new // self.fs
         self.comments = _comments
         self.fs = fs_new
-        # self.extract_NE()
 
     def get_fft(self, n=2048):
-        self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
-        fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
-        xf = fft.fftfreq(n, 1/self.fs)
+        &#34;&#34;&#34;
+        Generate the Fast Fourier Transform (FFT) of the data.
 
-        fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[1:])
-        fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+        Arguments
+        ---------
+            n: int (default=2048)
+                The number of points to use for the FFT.
+        &#34;&#34;&#34;
+        self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
+        fx = fft.fft(self.data.iloc[:, 1:].to_numpy(), n, axis=0)
+        xf = fft.fftfreq(n, 1 / self.fs)
+
+        fft_df = pd.DataFrame(fx[:len(xf) // 2, :], columns=self.data.columns[1:])
+        fft_df[&#39;f&#39;] = xf[:len(xf) // 2]
         self.fft = fft_df
 
     def butter(self, order=2, wn=1/10, fs=1, btype=&#39;lowpass&#39;):
-        b, a = signal.butter(2, wn, fs=fs, btype=btype)
-        self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;:fs, &#39;btype&#39;:btype, &#39;b&#39;: b, &#39;a&#39;:a}
+        &#34;&#34;&#34;
+        Generate a Butterworth filter.
+
+        Arguments
+        ---------
+            order: int (default=2)
+                The order of the filter.
+            wn: float (default=1/10)
+                The critical frequency.
+            fs: float (default=1)
+                The sampling frequency.
+            btype: str (default=&#39;lowpass&#39;)
+                The type of filter to generate (&#39;lowpass&#39;, &#39;highpass&#39;, &#39;bandpass&#39;, &#39;bandstop&#39;).
+        &#34;&#34;&#34;
+        b, a = signal.butter(order, wn, fs=fs, btype=btype)
+        self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;: fs, &#39;btype&#39;: btype, &#39;b&#39;: b, &#39;a&#39;: a}
         self.__log(f&#34;Generated Butterworth filter. Params:{self.filter_params}&#34;)
 
     def filter(self):
+        &#34;&#34;&#34;
+        Apply the generated filter to the data.
+        &#34;&#34;&#34;
         if self.filter_params is None:
             print(&#34;[ERROR] First call Experiment.butter() to generate a filter before filtering data.&#34;)
             return
@@ -548,9 +919,9 @@ Has methods that enable the estimation of feautures such as the area under the c
         self.__log(f&#34;Filtering data with {self.filter_params[&#39;btype&#39;]} {self.filter_params[&#39;Wn&#39;]} Hz&#34;)
 
         data = self.data.to_numpy()
-        ts = data[:,0]
+        ts = data[:, 0]
 
-        if (self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;):
+        if self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;:
             data = data - data.mean(axis=0)
 
         b = self.filter_params[&#39;b&#39;]
@@ -566,14 +937,21 @@ Has methods that enable the estimation of feautures such as the area under the c
         &#34;&#34;&#34;
         Reset data to the original dataframe generated when the object was instantiated.
         &#34;&#34;&#34;
-        self.__log(&#34;Reseting data to original values loaded from file.&#34;)
+        self.__log(&#34;Resetting data to original values loaded from file.&#34;)
         self.data = self._data.copy()
         self.comments = self._comments.copy()
-        self.filter_params=None
+        self.filter_params = None
         self.fs = 100
 
     def save(self, filename):
-        &#34;Save pickled object&#34;
+        &#34;&#34;&#34;
+        Save the object as a pickled file.
+
+        Arguments
+        ---------
+            filename: str
+                The path to save the pickled object.
+        &#34;&#34;&#34;
         self.__log(f&#34;Saving object as {filename}&#34;)
         with open(filename, &#34;wb&#34;) as f:
             pickle.dump(self, f)
@@ -587,14 +965,38 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">butter</span></span>(<span>self, order=2, wn=0.1, fs=1, btype='lowpass')</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Generate a Butterworth filter.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>order: int (default=2)
+    The order of the filter.
+wn: float (default=1/10)
+    The critical frequency.
+fs: float (default=1)
+    The sampling frequency.
+btype: str (default='lowpass')
+    The type of filter to generate ('lowpass', 'highpass', 'bandpass', 'bandstop').
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def butter(self, order=2, wn=1/10, fs=1, btype=&#39;lowpass&#39;):
-    b, a = signal.butter(2, wn, fs=fs, btype=btype)
-    self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;:fs, &#39;btype&#39;:btype, &#39;b&#39;: b, &#39;a&#39;:a}
+    &#34;&#34;&#34;
+    Generate a Butterworth filter.
+
+    Arguments
+    ---------
+        order: int (default=2)
+            The order of the filter.
+        wn: float (default=1/10)
+            The critical frequency.
+        fs: float (default=1)
+            The sampling frequency.
+        btype: str (default=&#39;lowpass&#39;)
+            The type of filter to generate (&#39;lowpass&#39;, &#39;highpass&#39;, &#39;bandpass&#39;, &#39;bandstop&#39;).
+    &#34;&#34;&#34;
+    b, a = signal.butter(order, wn, fs=fs, btype=btype)
+    self.filter_params = {&#39;type&#39;: &#39;butter&#39;, &#39;order&#39;: order, &#39;Wn&#39;: wn, &#39;fs&#39;: fs, &#39;btype&#39;: btype, &#39;b&#39;: b, &#39;a&#39;: a}
     self.__log(f&#34;Generated Butterworth filter. Params:{self.filter_params}&#34;)</code></pre>
 </details>
 </dd>
@@ -602,15 +1004,40 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">challenges_to_events</span></span>(<span>self, pre=60, post=60)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Convert identified challenges to Event objects.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>pre: int (default=60)
+    The number of seconds to include before the start of each challenge.
+post: int (default=60)
+    The number of seconds to include after the end of each challenge.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>events: dict
+    A dictionary of Event objects for each identified challenge.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def challenges_to_events(self, pre=60, post=60):
+    &#34;&#34;&#34;
+    Convert identified challenges to Event objects.
+
+    Arguments
+    ---------
+        pre: int (default=60)
+            The number of seconds to include before the start of each challenge.
+        post: int (default=60)
+            The number of seconds to include after the end of each challenge.
+
+    Returns
+    -------
+        events: dict
+            A dictionary of Event objects for each identified challenge.
+    &#34;&#34;&#34;
     events = {}
     for i in range(len(self.challenges.challenge)):
-        tmp = self.challenges.iloc[i,:]
+        tmp = self.challenges.iloc[i, :]
         tmp_challenge = Event(self, tmp.start, tmp.end, pre=pre, post=post)
         tmp_challenge.calc_features()
         events[tmp.challenge] = tmp_challenge
@@ -622,21 +1049,21 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">extract_NE</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Crawls through the comments to isolate NE-dose and generates its timeseries, appending 'NE dose' it to self.data</p></div>
+<div class="desc"><p>Crawl through the comments to isolate NE-dose and generate its timeseries, appending 'NE dose' to self.data.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def extract_NE(self):
     &#34;&#34;&#34;
-    Crawls through the comments to isolate NE-dose and generates its timeseries, appending &#39;NE dose&#39; it to self.data
+    Crawl through the comments to isolate NE-dose and generate its timeseries, appending &#39;NE dose&#39; to self.data.
     &#34;&#34;&#34;
     self.__log(&#34;Extracting NE&#34;)
     tmp = self.comments.str.extract(r&#39;(?P&lt;event&gt;NE.+)(?P&lt;dose&gt;\d\.\d{2}|Off)&#39;)
-    tmp = tmp[~tmp.iloc[:,0].isna()]
+    tmp = tmp[~tmp.iloc[:, 0].isna()]
 
-    tmp.iloc[-1,0] = &#39;NE Off&#39;
-    tmp.iloc[-1,-1] = 0
+    tmp.iloc[-1, 0] = &#39;NE Off&#39;
+    tmp.iloc[-1, -1] = 0
     ne_dose = np.zeros((self.data.shape[0],))
     for i in tmp.index.to_numpy():
         ne_dose[i:] = tmp[&#39;dose&#39;][i]
@@ -647,12 +1074,15 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">filter</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Apply the generated filter to the data.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def filter(self):
+    &#34;&#34;&#34;
+    Apply the generated filter to the data.
+    &#34;&#34;&#34;
     if self.filter_params is None:
         print(&#34;[ERROR] First call Experiment.butter() to generate a filter before filtering data.&#34;)
         return
@@ -660,9 +1090,9 @@ Has methods that enable the estimation of feautures such as the area under the c
     self.__log(f&#34;Filtering data with {self.filter_params[&#39;btype&#39;]} {self.filter_params[&#39;Wn&#39;]} Hz&#34;)
 
     data = self.data.to_numpy()
-    ts = data[:,0]
+    ts = data[:, 0]
 
-    if (self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;):
+    if self.filter_params[&#39;btype&#39;] != &#39;lowpass&#39;:
         data = data - data.mean(axis=0)
 
     b = self.filter_params[&#39;b&#39;]
@@ -676,23 +1106,64 @@ Has methods that enable the estimation of feautures such as the area under the c
 </details>
 </dd>
 <dt id="pynirs.data_objects.Experiment.from_dataframe"><code class="name flex">
-<span>def <span class="ident">from_dataframe</span></span>(<span>self, data: pandas.core.frame.DataFrame, repace_data=True) ‑> list[pandas.core.frame.DataFrame]</span>
+<span>def <span class="ident">from_dataframe</span></span>(<span>self, data: pandas.core.frame.DataFrame, fs: float = 1.0, replace_data=True) ‑> list[pandas.core.frame.DataFrame]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Create an Experiment object from a pandas DataFrame.</p></div>
+<div class="desc"><p>Create an Experiment object from a pandas DataFrame.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>data: pd.DataFrame
+    The data to be used for creating the Experiment object.
+fs: float (default=1.0)
+    The sampling frequency of the data.
+replace_data: bool (default=True)
+    Whether to replace the existing data with the provided data.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>data: pd.DataFrame
+    The processed data as a pandas DataFrame.
+comments: pd.Series
+    The comments extracted from the data.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def from_dataframe(self, data: pd.DataFrame, repace_data=True) -&gt; list[pd.DataFrame]:
+<pre><code class="python">def from_dataframe(self, data: pd.DataFrame, fs: float = 1.0, replace_data=True) -&gt; list[pd.DataFrame]:
     &#34;&#34;&#34;
     Create an Experiment object from a pandas DataFrame.
+
+    Arguments
+    ---------
+        data: pd.DataFrame
+            The data to be used for creating the Experiment object.
+        fs: float (default=1.0)
+            The sampling frequency of the data.
+        replace_data: bool (default=True)
+            Whether to replace the existing data with the provided data.
+
+    Returns
+    -------
+        data: pd.DataFrame
+            The processed data as a pandas DataFrame.
+        comments: pd.Series
+            The comments extracted from the data.
     &#34;&#34;&#34;
+
+    # Run some basic checks on the data
+    if &#39;comments&#39; not in data.columns:
+        raise ValueError(&#34;Dataframe must contain a &#39;comments&#39; column.&#34;)
+    
     self.__log(f&#34;Generating from dataframe: {data}&#34;)
     self.data = data
     comments = data.pop(&#39;comments&#39;)
-    data.pop(&#39;datetime&#39;)
     comments = comments[~comments.isna()].copy()
+
+    if &#34;datetime&#34; in data.columns:
+        data.pop(&#39;datetime&#39;)
+    
+    if &#34;ts&#34; not in data.columns:
+        data[&#34;ts&#34;] = np.arange(0, 1/fs, data.shape[0]/fs)
+        
     return data, comments</code></pre>
 </details>
 </dd>
@@ -700,24 +1171,32 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">get_challenges</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.</p></div>
+<div class="desc"><p>Crawl through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc.) and return indices.</p>
+<h2 id="returns">Returns</h2>
+<pre><code>challenges: pd.DataFrame
+    A DataFrame containing the identified challenges with their start and end indices and durations.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_challenges(self):
     &#34;&#34;&#34;
-    Crawls through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc) and returns indices.
+    Crawl through comments to identify various events in the data (Hypoxia, Baseline, MAP, etc.) and return indices.
+
+    Returns
+    -------
+        challenges: pd.DataFrame
+            A DataFrame containing the identified challenges with their start and end indices and durations.
     &#34;&#34;&#34;
     self.__log(&#34;Extracting physiological challenges&#34;)
-    challenges=[]
-    tmp  = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
+    challenges = []
+    tmp = self.comments.str.extract(r&#34; (?P&lt;challenge&gt;hypoxia.\d*|NE|BSL).*(?P&lt;type&gt;start|end|off|stop)&#34;, flags=re.IGNORECASE, expand=False)
     tmp = tmp[~tmp[&#39;challenge&#39;].isna()]
     for challenge in tmp.challenge.unique():
-        print(challenge)
         if len(tmp[tmp[&#39;challenge&#39;] == challenge].index):
-            start, end = tmp[tmp[&#39;challenge&#39;]==challenge].index
-        challenges.append([challenge, start, end, end-start+1])
+            start, end = tmp[tmp[&#39;challenge&#39;] == challenge].index
+        challenges.append([challenge, start, end, end - start + 1])
     challenges = pd.DataFrame(challenges, columns=[&#39;challenge&#39;, &#39;start&#39;, &#39;end&#39;, &#39;duration&#39;])
     self.challenges = challenges
     return self.challenges</code></pre>
@@ -727,18 +1206,30 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">get_fft</span></span>(<span>self, n=2048)</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Generate the Fast Fourier Transform (FFT) of the data.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>n: int (default=2048)
+    The number of points to use for the FFT.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_fft(self, n=2048):
-    self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
-    fx = fft.fft(self.data.iloc[:,1:].to_numpy(), n, axis=0)
-    xf = fft.fftfreq(n, 1/self.fs)
+    &#34;&#34;&#34;
+    Generate the Fast Fourier Transform (FFT) of the data.
 
-    fft_df = pd.DataFrame(fx[:len(xf)//2,:], columns=self.data.columns[1:])
-    fft_df[&#39;f&#39;] = xf[:len(xf)//2]
+    Arguments
+    ---------
+        n: int (default=2048)
+            The number of points to use for the FFT.
+    &#34;&#34;&#34;
+    self.__log(f&#34;Generating FFT with fs={self.fs}&#34;)
+    fx = fft.fft(self.data.iloc[:, 1:].to_numpy(), n, axis=0)
+    xf = fft.fftfreq(n, 1 / self.fs)
+
+    fft_df = pd.DataFrame(fx[:len(xf) // 2, :], columns=self.data.columns[1:])
+    fft_df[&#39;f&#39;] = xf[:len(xf) // 2]
     self.fft = fft_df</code></pre>
 </details>
 </dd>
@@ -746,28 +1237,65 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">get_log</span></span>(<span>self)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Returns the log of the experiment object</p></div>
+<div class="desc"><p>Return the log of the experiment object.</p>
+<h2 id="returns">Returns</h2>
+<pre><code>log: list
+    A list of log statements.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_log(self):
-    &#34;&#34;&#34;Returns the log of the experiment object&#34;&#34;&#34;
+    &#34;&#34;&#34;
+    Return the log of the experiment object.
+
+    Returns
+    -------
+        log: list
+            A list of log statements.
+    &#34;&#34;&#34;
     return self._log</code></pre>
 </details>
 </dd>
 <dt id="pynirs.data_objects.Experiment.load_file"><code class="name flex">
-<span>def <span class="ident">load_file</span></span>(<span>self, filename: str, repace_data=True) ‑> list[pandas.core.frame.DataFrame]</span>
+<span>def <span class="ident">load_file</span></span>(<span>self, filename: str, replace_data=True) ‑> list[pandas.core.frame.DataFrame]</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Loads a CSV file and converts it to a pandas dataframe.</p></div>
+<div class="desc"><p>Load a CSV file and convert it to a pandas DataFrame.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>filename: str
+    The path to the CSV file to be loaded.
+replace_data: bool (default=True)
+    Whether to replace the existing data with the loaded data.
+</code></pre>
+<h2 id="returns">Returns</h2>
+<pre><code>data: pd.DataFrame
+    The loaded data as a pandas DataFrame.
+comments: pd.Series
+    The comments extracted from the data.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def load_file(self, filename: str, repace_data=True) -&gt; list[pd.DataFrame]:
+<pre><code class="python">def load_file(self, filename: str, replace_data=True) -&gt; list[pd.DataFrame]:
     &#34;&#34;&#34;
-    Loads a CSV file and converts it to a pandas dataframe.
+    Load a CSV file and convert it to a pandas DataFrame.
+
+    Arguments
+    ---------
+        filename: str
+            The path to the CSV file to be loaded.
+        replace_data: bool (default=True)
+            Whether to replace the existing data with the loaded data.
+
+    Returns
+    -------
+        data: pd.DataFrame
+            The loaded data as a pandas DataFrame.
+        comments: pd.Series
+            The comments extracted from the data.
     &#34;&#34;&#34;
     self.__log(f&#34;Loading {filename}&#34;)
     data = pd.read_csv(filename, low_memory=False)
@@ -781,7 +1309,11 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">resample</span></span>(<span>self, fs_new)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Resample data to the given sampling rate.</p></div>
+<div class="desc"><p>Resample data to the given sampling rate.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>fs_new: float
+    The new sampling rate to resample the data to.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -789,13 +1321,18 @@ Has methods that enable the estimation of feautures such as the area under the c
 <pre><code class="python">def resample(self, fs_new):
     &#34;&#34;&#34;
     Resample data to the given sampling rate.
+
+    Arguments
+    ---------
+        fs_new: float
+            The new sampling rate to resample the data to.
     &#34;&#34;&#34;
     self.__log(f&#34;Resampling from {self.fs:0.2f} to {fs_new:0.2f} Hz&#34;)
     nsamples = np.int16(self.data.shape[0] * fs_new // self.fs)
     d_np = self.data.to_numpy()
     d_r = signal.resample(d_np, nsamples, axis=0)
     df_r = pd.DataFrame(d_r, columns=self.data.columns)
-    ts = np.arange(0, d_r.shape[0]/fs_new, 1/fs_new)
+    ts = np.arange(0, d_r.shape[0] / fs_new, 1 / fs_new)
     df_r[&#39;ts&#39;] = ts
     self.data = df_r
     self._comments = self.comments.copy()
@@ -803,8 +1340,7 @@ Has methods that enable the estimation of feautures such as the area under the c
     _comments = self.comments.copy()
     _comments.index = _comments.index.to_numpy() * fs_new // self.fs
     self.comments = _comments
-    self.fs = fs_new
-    # self.extract_NE()</code></pre>
+    self.fs = fs_new</code></pre>
 </details>
 </dd>
 <dt id="pynirs.data_objects.Experiment.reset"><code class="name flex">
@@ -820,10 +1356,10 @@ Has methods that enable the estimation of feautures such as the area under the c
     &#34;&#34;&#34;
     Reset data to the original dataframe generated when the object was instantiated.
     &#34;&#34;&#34;
-    self.__log(&#34;Reseting data to original values loaded from file.&#34;)
+    self.__log(&#34;Resetting data to original values loaded from file.&#34;)
     self.data = self._data.copy()
     self.comments = self._comments.copy()
-    self.filter_params=None
+    self.filter_params = None
     self.fs = 100</code></pre>
 </details>
 </dd>
@@ -831,13 +1367,24 @@ Has methods that enable the estimation of feautures such as the area under the c
 <span>def <span class="ident">save</span></span>(<span>self, filename)</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Save pickled object</p></div>
+<div class="desc"><p>Save the object as a pickled file.</p>
+<h2 id="arguments">Arguments</h2>
+<pre><code>filename: str
+    The path to save the pickled object.
+</code></pre></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def save(self, filename):
-    &#34;Save pickled object&#34;
+    &#34;&#34;&#34;
+    Save the object as a pickled file.
+
+    Arguments
+    ---------
+        filename: str
+            The path to save the pickled object.
+    &#34;&#34;&#34;
     self.__log(f&#34;Saving object as {filename}&#34;)
     with open(filename, &#34;wb&#34;) as f:
         pickle.dump(self, f)</code></pre>

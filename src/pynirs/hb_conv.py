@@ -8,7 +8,7 @@ Date: 05-OCT-2024
 
 import numpy as np
 import pandas as pd
-from nirs_types import *
+# from nirs_types import *
 
 
 class NIRSData:
